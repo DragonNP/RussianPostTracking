@@ -1,4 +1,4 @@
-import refractor_track
+import refactor_track
 
 
 def format_route_short(history_track, barcode):
@@ -61,9 +61,13 @@ def get_format(history, only_history=False):
 def get_specs(barcode, history_track, mass_item):
     specs = '🛳 Посылка *' + barcode + '*\n\n'
 
-    specs += 'Маршурт: *' + refractor_track.get_route(history_track) + '*\n'
-    specs += 'Отправитель: *' + refractor_track.get_sender(history_track) + '*\n'
-    specs += 'Получатель: *' + refractor_track.get_recipient(history_track) + '*\n'
+    route = refractor_track.get_route(history_track)
+    sender = refractor_track.get_sender(history_track)
+    recipient = refractor_track.get_recipient(history_track)
+
+    specs += f'Маршурт: *{route}*\n'
+    specs += f'Отправитель: *{sender}*\n'
+    specs += f'Получатель: *{recipient}*\n'
 
     specs += 'Масса посылки: *' + str(mass_item) + ' гр. *\n\n'
 
