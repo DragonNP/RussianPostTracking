@@ -1,14 +1,14 @@
 import telegram
 import logging
 import format_helper
-import sys
+import os
 from russian_post_tracking.soap import RussianPostTracking
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters, CallbackQueryHandler
 
-login = sys.argv[1]
-password = sys.argv[2]
-bot_token = sys.argv[3]
+login = os.environ.get('RPT_LOGIN', None)
+password = os.environ.get('RPT_PASSWORD', None)
+bot_token = os.environ.get('TELEGRAM_API', None)
 
 
 def get_keyboard_track(barcode):
