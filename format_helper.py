@@ -6,7 +6,7 @@ def format_route_short(history_track, barcode):
 
     for i in range(len(history_track.historyRecord) - 1, -1, -1):
         history = history_track.historyRecord[i]
-        new_mass_item = refractor_track.get_mass_item(history)
+        new_mass_item = refactor_track.get_mass_item(history)
         if new_mass_item != 0:
             mass_item = new_mass_item
 
@@ -41,15 +41,15 @@ def format_route(history_track, barcode):
 def get_format(history, only_history=False):
     history_travel = ''
     mass_item = None
-    operation_address = refractor_track.get_operation_address(history)
+    operation_address = refactor_track.get_operation_address(history)
 
     if not only_history:
-        new_mass_item = refractor_track.get_mass_item(history)
+        new_mass_item = refactor_track.get_mass_item(history)
         if new_mass_item != 0:
             mass_item = new_mass_item
 
-    history_travel += '*[' + refractor_track.get_date_operation(history) + ']*: '
-    history_travel += refractor_track.get_operation(history)
+    history_travel += '*[' + refactor_track.get_date_operation(history) + ']*: '
+    history_travel += refactor_track.get_operation(history)
     if operation_address != '':
         history_travel += ' (' + operation_address + ')'
 
@@ -61,9 +61,9 @@ def get_format(history, only_history=False):
 def get_specs(barcode, history_track, mass_item):
     specs = '🛳 Посылка *' + barcode + '*\n\n'
 
-    route = refractor_track.get_route(history_track)
-    sender = refractor_track.get_sender(history_track)
-    recipient = refractor_track.get_recipient(history_track)
+    route = refactor_track.get_route(history_track)
+    sender = refactor_track.get_sender(history_track)
+    recipient = refactor_track.get_recipient(history_track)
 
     specs += f'Маршурт: *{route}*\n'
     specs += f'Отправитель: *{sender}*\n'

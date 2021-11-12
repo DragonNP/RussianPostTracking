@@ -10,6 +10,8 @@ login = os.environ.get('RPT_LOGIN', None)
 password = os.environ.get('RPT_PASSWORD', None)
 bot_token = os.environ.get('TELEGRAM_API', None)
 
+logger = logging.getLogger('main')
+
 
 def get_keyboard_track(barcode):
     keyboard = [
@@ -21,11 +23,14 @@ def get_keyboard_track(barcode):
 
 
 def send_start_msg(update: Update, context: CallbackContext) -> None:
+    logger.info('Новое сообщение: /start или /help')
+
     update.message.reply_text('Этот бот может отслеживать посылки через сервис Почта России\n'
                               'Чтобы узнать где находится ваша посылка, просто введие номер отправления')
 
 
 def send_track_wait(update: Update, context: CallbackContext) -> None:
+    logger.info('Отправка истории передвижения посылки')
     barcode = update.message.text
 
     message = update.message.reply_text('*Отслеживаю посылку..*', parse_mode=telegram.ParseMode.MARKDOWN)
@@ -69,6 +74,7 @@ def main() -> None:
     # Start the Bot
     updater.start_polling()
 
+    logger.info('Бот работает')
     # Run the bot until the user presses Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT
     updater.idle()
