@@ -33,7 +33,7 @@ def send_track_wait(update: Update, context: CallbackContext) -> None:
     logger.info('Отправка истории передвижения посылки')
     barcode = update.message.text
 
-    message = update.message.reply_text('*Отслеживаю посылку..*', parse_mode=telegram.ParseMode.MARKDOWN)
+    message = update.message.reply_text('*Отслеживаю посылку...*', parse_mode=telegram.ParseMode.MARKDOWN)
     send_short_history(barcode, message)
 
 
@@ -54,8 +54,17 @@ def send_short_history(barcode, msg):
     history_track = tracking.get_history()
 
     output = format_helper.format_route_short(history_track, barcode)
+    if output is None:
+        return msg.edit_text('*История передвежений посылки не найдена.*', parse_mode=telegram.ParseMode.MARKDOWN)
 
     msg.edit_text(output, reply_markup=get_keyboard_track(barcode), parse_mode=telegram.ParseMode.MARKDOWN)
+
+
+def error_callback(update: Update, context: CallbackContext):
+    error: Exception = context.error
+
+    logger.error(error.__context__)
+    update.message.reply_text('Введите корректный номер')
 
 
 def main() -> None:
@@ -70,6 +79,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler('help', send_start_msg))
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, send_track_wait))
     dispatcher.add_handler(CallbackQueryHandler(send_all_history))
+    dispatcher.add_error_handler(error_callback)
 
     # Start the Bot
     updater.start_polling()

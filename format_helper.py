@@ -1,23 +1,30 @@
+import logging
 import refactor_track
+
+logger = logging.getLogger('format_helper')
 
 
 def format_route_short(history_track, barcode):
-    mass_item = ''
+    try:
+        mass_item = ''
 
-    for i in range(len(history_track.historyRecord) - 1, -1, -1):
-        history = history_track.historyRecord[i]
-        new_mass_item = refactor_track.get_mass_item(history)
-        if new_mass_item != 0:
-            mass_item = new_mass_item
+        for i in range(len(history_track.historyRecord) - 1, -1, -1):
+            history = history_track.historyRecord[i]
+            new_mass_item = refactor_track.get_mass_item(history)
+            if new_mass_item != 0:
+                mass_item = new_mass_item
 
-    last = len(history_track.historyRecord) - 1
-    history = history_track.historyRecord[last]
-    history_travel = get_format(history, only_history=True)
+        last = len(history_track.historyRecord) - 1
+        history = history_track.historyRecord[last]
+        history_travel = get_format(history, only_history=True)
 
-    specs = get_specs(barcode, history_track, mass_item)
-    output = specs + history_travel
+        specs = get_specs(barcode, history_track, mass_item)
+        output = specs + history_travel
 
-    return output
+        return output
+    except AttributeError:
+        logger.info(f'historyRecord не найден. История передвежний: {history_track}')
+        return None
 
 
 def format_route(history_track, barcode):
