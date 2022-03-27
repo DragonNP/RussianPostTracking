@@ -6,7 +6,8 @@ logger = logging.getLogger('database')
 
 
 class UsersDB(object):
-    def __init__(self, location):
+    def __init__(self, location, logger_level):
+        logger.setLevel(logger_level)
         logger.debug('Инициализация базы данных пользователей')
 
         self.location = os.path.expanduser(location)

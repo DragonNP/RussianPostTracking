@@ -10,10 +10,12 @@ from database import UsersDB
 login = os.environ.get('RPT_LOGIN', None)
 password = os.environ.get('RPT_PASSWORD', None)
 bot_token = os.environ.get('TELEGRAM_API', None)
+logger_level = os.environ.get('LOGGER_LEVEL', 'INFO')
 
 logger = logging.getLogger('main')
+logger.setLevel(logger_level)
 
-users = UsersDB('./users.json')
+users = UsersDB('./users.json', logger_level)
 
 
 def get_keyboard_track(barcode, isTracked=False):
@@ -76,7 +78,6 @@ def send_all_history(update: Update, context: CallbackContext) -> None:
 
 
 def add_barcode_in_track(update: Update, context: CallbackContext) -> None:
-
     query = update.callback_query
     query.answer()
 
@@ -89,7 +90,6 @@ def add_barcode_in_track(update: Update, context: CallbackContext) -> None:
 
 
 def remove_barcode_in_track(update: Update, context: CallbackContext) -> None:
-
     query = update.callback_query
     query.answer()
 
