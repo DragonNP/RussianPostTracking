@@ -49,27 +49,11 @@ class UsersDB(object):
                 logger.debug(f'Пользователь уже создан. id пользователя:{user_id}')
                 return False
 
-            self.db[str(user_id)] = {'barcodes': [], 'time': ''}
+            self.db[str(user_id)] = {'barcodes': []}
             self.__dumpdb()
             return True
         except Exception as e:
             logger.error(f'Не удалось созранить пользователя. id пользователя:{user_id}', e)
-            return False
-
-    def update_time(self, user_id: int, time: str):
-        logger.debug(f'Обновление времени. id пользователя:{user_id}, новое время:{time}')
-
-        try:
-            user_in_db = self.__check_user(user_id)
-            if not user_in_db:
-                logger.debug(f'Пользователь не найден. id пользователя:{user_id}')
-                self.add_user(user_id)
-
-            self.db[str(user_id)]['time'] = time
-            self.__dumpdb()
-            return True
-        except Exception as e:
-            logger.error(f'Не удалось обновить время. id пользователя:{user_id}, новое время:{time}', e)
             return False
 
     def update_barcode(self, user_id: int, curr_barcode: str, remove=False):
