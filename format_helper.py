@@ -4,6 +4,15 @@ import refactor_track
 logger = logging.getLogger('format_helper')
 
 
+def get_last_update(history_track):
+    last = len(history_track.historyRecord) - 1
+    history = history_track.historyRecord[last]
+
+    last_update = refactor_track.get_date_operation(history)
+
+    return last_update
+
+
 def format_route_short(history_track, barcode):
     try:
         mass_item = ''
@@ -20,7 +29,6 @@ def format_route_short(history_track, barcode):
 
         specs = get_specs(barcode, history_track, mass_item)
         output = specs + history_travel
-
         return output
     except AttributeError:
         logger.info(f'historyRecord не найден. История передвежний: {history_track}')

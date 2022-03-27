@@ -49,16 +49,16 @@ class UsersDB(object):
                 logger.debug(f'Пользователь уже создан. id пользователя:{user_id}')
                 return False
 
-            self.db[str(user_id)] = {'barcodes': []}
+            self.db[str(user_id)] = {'barcodes': {}}
             self.__dumpdb()
             return True
         except Exception as e:
             logger.error(f'Не удалось созранить пользователя. id пользователя:{user_id}', e)
             return False
 
-    def update_barcode(self, user_id: int, curr_barcode: str, remove=False):
+    def update_barcode(self, user_id: int, curr_barcode: str, last_update: str = None, remove=False):
         logger.debug(
-            f'Обновление трек-номера. id пользователя:{user_id}, новый трек-номер:{curr_barcode}, удалить={remove}')
+            f'Обновление трек-номера. id пользователя:{user_id}, новый трек-номер:{curr_barcode}, последнее обновление={last_update}, удалить={remove}')
 
         try:
             user_in_db = self.__check_user(user_id)
@@ -67,18 +67,18 @@ class UsersDB(object):
                 self.add_user(user_id)
 
             barcodes = self.db[str(user_id)]['barcodes']
-            if remove:
+            if remove or last_update is None:
                 if not (curr_barcode in barcodes):
                     logger.debug(
-                        f'Трек-номер не был сохранен. id пользователя:{user_id}, новый трек-номер:{curr_barcode}, удалить={remove}')
+                        f'Трек-номер не был сохранен. id пользователя:{user_id}, новый трек-номер:{curr_barcode}, последнее обновление={last_update}, удалить={remove}')
                     return False
                 barcodes.remove(curr_barcode)
             else:
                 if curr_barcode in barcodes:
                     logger.debug(
-                        f'Трек-номер уже сохранен. id пользователя:{user_id}, новый трек-номер:{curr_barcode}, удалить={remove}')
+                        f'Трек-номер уже сохранен. id пользователя:{user_id}, новый трек-номер:{curr_barcode}, последнее обновление={last_update}, удалить={remove}')
                     return False
-                barcodes.append(curr_barcode)
+                barcodes[curr_barcode] = last_update
             self.db[str(user_id)]['barcodes'] = barcodes
             self.__dumpdb()
             return True

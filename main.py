@@ -18,15 +18,15 @@ logger.setLevel(logger_level)
 users = UsersDB('./users.json', logger_level)
 
 
-def get_keyboard_track(barcode, isTracked=False):
+def get_keyboard_track(barcode, isTracked=False, last_update=''):
     keyboard = [
         [InlineKeyboardButton("Показать полный путь", callback_data='show_all_route_' + barcode)],
     ]
 
     if isTracked:
-        keyboard.append([InlineKeyboardButton("Перестать отслеживать", callback_data='remove_from_tracked' + barcode)])
+        keyboard.append([InlineKeyboardButton("Перестать отслеживать", callback_data='remove_from_tracked_' + barcode)])
     else:
-        keyboard.append([InlineKeyboardButton("Отслеживать", callback_data='add_to_tracked_' + barcode)])
+        keyboard.append([InlineKeyboardButton("Отслеживать", callback_data=f'add_to_tracked_{barcode}_{last_update}')])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     return reply_markup
@@ -72,8 +72,10 @@ def send_all_history(update: Update, context: CallbackContext) -> None:
     logger.info(f'Отправка полной информации о трек-номере. barcode:{barcode}, user:{query.from_user.id}')
 
     output = format_helper.format_route(history_track, barcode)
+    last_update = format_helper.get_last_update(history_track)
+
     isTracked = users.check_barcode(query.from_user.id, barcode)
-    query.edit_message_text(text=output, reply_markup=get_keyboard_track(barcode, isTracked=isTracked),
+    query.edit_message_text(text=output, reply_markup=get_keyboard_track(barcode, isTracked=isTracked, last_update=last_update),
                             parse_mode=telegram.ParseMode.MARKDOWN)
 
 
@@ -81,8 +83,8 @@ def add_barcode_in_track(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     query.answer()
 
-    barcode = query.data.replace('add_to_tracked_', '')
-    result = users.update_barcode(query.from_user.id, barcode)
+    barcode, last_update = query.data.replace('add_to_tracked_', '').split('_')
+    result = users.update_barcode(query.from_user.id, barcode, last_update=last_update)
 
     logger.info(f'Добавление трек-номера в отслеживаемое. barcode:{barcode}, user:{query.from_user.id}')
 
@@ -108,12 +110,13 @@ def send_short_history(barcode, msg):
     history_track = tracking.get_history()
 
     output = format_helper.format_route_short(history_track, barcode)
+    last_update = format_helper.get_last_update(history_track)
 
     if output is None:
         return msg.edit_text('*История передвежений посылки не найдена.*', parse_mode=telegram.ParseMode.MARKDOWN)
 
     isTracked = users.check_barcode(msg.chat_id, barcode)
-    msg.edit_text(output, reply_markup=get_keyboard_track(barcode, isTracked=isTracked),
+    msg.edit_text(output, reply_markup=get_keyboard_track(barcode, isTracked=isTracked, last_update=last_update),
                   parse_mode=telegram.ParseMode.MARKDOWN)
 
 
