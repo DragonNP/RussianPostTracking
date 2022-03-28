@@ -1,6 +1,4 @@
 import datetime
-import json
-
 import telegram
 import logging
 import format_helper
@@ -25,7 +23,7 @@ users = UsersDB('./users.json', logger_level)
 barcodes_db = BarcodesDB('./barcodes.json', logger_level)
 
 
-def get_keyboard_track(barcode, isTracked=False, last_update=''):
+def get_keyboard_track(barcode, isTracked=False):
     keyboard = [
         [InlineKeyboardButton("Показать полный путь", callback_data='show_all_route_' + barcode)],
     ]
@@ -33,7 +31,7 @@ def get_keyboard_track(barcode, isTracked=False, last_update=''):
     if isTracked:
         keyboard.append([InlineKeyboardButton("Перестать отслеживать", callback_data='remove_from_tracked_' + barcode)])
     else:
-        keyboard.append([InlineKeyboardButton("Отслеживать", callback_data=f'add_to_tracked_{barcode}_{last_update}')])
+        keyboard.append([InlineKeyboardButton("Отслеживать", callback_data=f'add_to_tracked_{barcode}')])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     return reply_markup
@@ -88,11 +86,10 @@ def send_all_history(update: Update, context: CallbackContext) -> None:
         barcodes_db.add_barcode(barcode, history_track)
 
     output = format_helper.format_route(history_track, barcode)
-    last_update = format_helper.get_last_update(history_track)
 
     isTracked = users.check_barcode(query.from_user.id, barcode)
     query.edit_message_text(text=output,
-                            reply_markup=get_keyboard_track(barcode, isTracked=isTracked, last_update=last_update),
+                            reply_markup=get_keyboard_track(barcode, isTracked=isTracked),
                             parse_mode=telegram.ParseMode.MARKDOWN)
 
 
@@ -100,8 +97,8 @@ def add_barcode_in_track(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     query.answer()
 
-    barcode, last_update = query.data.replace('add_to_tracked_', '').split('_')
-    result = users.update_barcode(query.from_user.id, barcode, last_update=last_update)
+    barcode = query.data.replace('add_to_tracked_', '')
+    result = users.update_barcode(query.from_user.id, barcode)
 
     logger.info(f'Добавление трек-номера в отслеживаемое. трек-номер:{barcode}, пользователь:{query.from_user.id}')
 
@@ -131,7 +128,6 @@ def send_short_history(barcode: str, user_id: int = 0, bot=None, msg: telegram.m
         barcodes_db.add_barcode(barcode, history_track)
 
     output = format_helper.format_route_short(history_track, barcode)
-    last_update = format_helper.get_last_update(history_track)
 
     if output is None:
         if user_id > 0:
@@ -142,10 +138,9 @@ def send_short_history(barcode: str, user_id: int = 0, bot=None, msg: telegram.m
     if user_id > 0:
         isTracked = users.check_barcode(user_id, barcode)
         return bot.send_message(chat_id=user_id, text=output, parse_mode=telegram.ParseMode.MARKDOWN,
-                                reply_markup=get_keyboard_track(barcode, isTracked=isTracked,
-                                                                last_update=last_update))
+                                reply_markup=get_keyboard_track(barcode, isTracked=isTracked))
     isTracked = users.check_barcode(msg.chat_id, barcode)
-    return msg.edit_text(output, reply_markup=get_keyboard_track(barcode, isTracked=isTracked, last_update=last_update),
+    return msg.edit_text(output, reply_markup=get_keyboard_track(barcode, isTracked=isTracked),
                          parse_mode=telegram.ParseMode.MARKDOWN)
 
 
@@ -157,14 +152,12 @@ def check_new_update(context: CallbackContext):
 
         for curr_barcode in barcodes:
             tracking = RussianPostTracking(curr_barcode, login, password)
-            history_track = tracking.get_history()
+            history_track = refactor_track.convert_to_json(tracking.get_history())
 
-            last_update = format_helper.get_last_update(history_track)
-
-            if last_update == barcodes[curr_barcode]:
+            if history_track == barcodes_db.get_history_track(curr_barcode):
                 continue
 
-            users.update_barcode(int(user_id), curr_barcode, last_update)
+            barcodes_db.update_history_track(curr_barcode, history_track)
             send_short_history(barcode=curr_barcode, user_id=int(user_id), bot=context.bot)
 
 

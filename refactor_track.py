@@ -6,7 +6,7 @@ import json as json_module
 logger = logging.getLogger('refactor_track')
 
 
-def recursion(json):
+def suds_to_json(json):
     for key in json:
         try:
             if 'suds' in str(json):
@@ -18,13 +18,15 @@ def recursion(json):
                     continue
                 else:
                     json[key] = Client.dict(json[key])
-                    json[key] = recursion(json[key])
+                    json[key] = suds_to_json(json[key])
         except Exception as e:
             logger.error(e)
     return json
 
 
 def convert_to_json(history_track):
+    logger.debug('Конвертация истории трек-номера в json')
+
     if isinstance(history_track, str):
         return json_module.loads(history_track)
 
@@ -33,7 +35,7 @@ def convert_to_json(history_track):
         if isinstance(json[key], list):
             for i in range(len(json[key])):
                 json[key][i] = Client.dict(json[key][i])
-                json[key][i] = recursion(json[key][i])
+                json[key][i] = suds_to_json(json[key][i])
     return json
 
 

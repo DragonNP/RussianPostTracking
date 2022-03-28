@@ -47,17 +47,17 @@ class UsersDB:
                 self.logger.debug(f'Пользователь уже создан. id пользователя:{user_id}')
                 return False
 
-            self.db[str(user_id)] = {'barcodes': {}}
+            self.db[str(user_id)] = {'barcodes': []}
             self.__dump_db()
             return True
         except Exception as e:
-            self.logger.error(f'Не удалось созранить пользователя. id пользователя:{user_id}', e)
+            self.logger.error(f'Не удалось сохранить пользователя. id пользователя:{user_id}', e)
             return False
 
-    def update_barcode(self, user_id: int, curr_barcode: str, last_update: str = None, remove=False):
+    def update_barcode(self, user_id: int, curr_barcode: str, remove=False):
         self.logger.debug(
             f'Обновление трек-номера. id пользователя:{user_id}, '
-            f'новый трек-номер:{curr_barcode}, последнее обновление={last_update}, удалить={remove}')
+            f'новый трек-номер:{curr_barcode}, удалить={remove}')
 
         try:
             user_in_db = self.__check_user(user_id)
@@ -65,11 +65,11 @@ class UsersDB:
                 self.logger.debug(f'Пользователь не найден. id пользователя:{user_id}')
                 self.add_user(user_id)
 
-            barcodes = self.db[str(user_id)]['barcodes']
-            if remove or last_update is None:
-                barcodes.pop(curr_barcode)
+            barcodes: list = self.db[str(user_id)]['barcodes']
+            if remove:
+                barcodes.remove(curr_barcode)
             else:
-                barcodes[curr_barcode] = last_update
+                barcodes.append(curr_barcode)
             self.db[str(user_id)]['barcodes'] = barcodes
             self.__dump_db()
             return True
@@ -152,6 +152,7 @@ class BarcodesDB:
             return False
 
     def get_history_track(self, barcode: str):
+        self.logger.debug(f'Получение истории перемещений. трек-номер:{barcode}')
         try:
             if not self.__check_barcode(barcode):
                 self.logger.debug(f'Трек-номер не сохранен в базе данных. трек-номер:{barcode}')
@@ -161,3 +162,19 @@ class BarcodesDB:
         except Exception as e:
             self.logger.error(f'Не удалось получить историю отправлений. трек-номер:{barcode}', e)
             return None
+
+    def update_history_track(self, barcode: str, history_track: json):
+        self.logger.debug(f'Обновление истории передвижений трек-номера. трек-номер:{barcode}')
+
+        try:
+            if not self.__check_barcode(barcode):
+                self.logger.debug(f'Трек-номер не добавлен. трек-номер:{barcode}')
+                return False
+
+            self.db[barcode] = history_track
+            self.__dump_db()
+            return True
+        except Exception as e:
+            self.logger.error(f'Не удалось сохранить историю передвижений трек-номера. трек-номер:{barcode}', e)
+            return False
+
