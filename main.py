@@ -1,10 +1,12 @@
+import datetime
 import telegram
 import logging
 import format_helper
 import os
 from russian_post_tracking.soap import RussianPostTracking
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters, CallbackQueryHandler
+from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters, CallbackQueryHandler, \
+    JobQueue
 from database import UsersDB
 
 login = os.environ.get('RPT_LOGIN', None)
@@ -49,6 +51,7 @@ def send_track_wait(update: Update, context: CallbackContext) -> None:
     logger.info(f'Отправка истории передвижения посылки. пользователь:{update.effective_user.id}, трек-номер:{barcode}')
 
     message = update.message.reply_text('*Отслеживаю посылку...*', parse_mode=telegram.ParseMode.MARKDOWN)
+    print(type(message))
     send_short_history(barcode, message)
 
 
@@ -78,7 +81,8 @@ def send_all_history(update: Update, context: CallbackContext) -> None:
     last_update = format_helper.get_last_update(history_track)
 
     isTracked = users.check_barcode(query.from_user.id, barcode)
-    query.edit_message_text(text=output, reply_markup=get_keyboard_track(barcode, isTracked=isTracked, last_update=last_update),
+    query.edit_message_text(text=output,
+                            reply_markup=get_keyboard_track(barcode, isTracked=isTracked, last_update=last_update),
                             parse_mode=telegram.ParseMode.MARKDOWN)
 
 
@@ -106,7 +110,7 @@ def remove_barcode_in_track(update: Update, context: CallbackContext) -> None:
     query.edit_message_reply_markup(reply_markup=get_keyboard_track(barcode, isTracked=result))
 
 
-def send_short_history(barcode, msg):
+def send_short_history(barcode: str, msg: telegram.message.Message):
     logger.info(f'Отправка базовой информации о трек-номере. трек-номер:{barcode}, пользователь:{msg.chat_id}')
 
     tracking = RussianPostTracking(barcode, login, password)
@@ -123,6 +127,43 @@ def send_short_history(barcode, msg):
                   parse_mode=telegram.ParseMode.MARKDOWN)
 
 
+def send_short_history_by_user_id(context: CallbackContext, barcode: str, user_id: int):
+    logger.info(f'Отправка базовой информации о трек-номере. трек-номер:{barcode}, пользователь:{user_id}')
+
+    tracking = RussianPostTracking(barcode, login, password)
+    history_track = tracking.get_history()
+
+    output = format_helper.format_route_short(history_track, barcode)
+    last_update = format_helper.get_last_update(history_track)
+
+    if output is None:
+        return context.bot.send_message(chat_id=user_id, text='*История передвежений посылки не найдена.*',
+                                        parse_mode=telegram.ParseMode.MARKDOWN)
+
+    isTracked = users.check_barcode(user_id, barcode)
+    context.bot.send_message(chat_id=user_id, text=output, parse_mode=telegram.ParseMode.MARKDOWN,
+                             reply_markup=get_keyboard_track(barcode, isTracked=isTracked, last_update=last_update))
+
+
+def check_new_update(context: CallbackContext):
+    database = users.get_db()
+
+    for user_id in database:
+        barcodes = database[user_id]['barcodes']
+
+        for curr_barcode in barcodes:
+            tracking = RussianPostTracking(curr_barcode, login, password)
+            history_track = tracking.get_history()
+
+            last_update = format_helper.get_last_update(history_track)
+
+            if last_update == barcodes[curr_barcode]:
+                continue
+
+            users.update_barcode(int(user_id), curr_barcode, last_update)
+            send_short_history_by_user_id(context, curr_barcode, int(user_id))
+
+
 def error_callback(update: Update, context: CallbackContext):
     error: Exception = context.error
 
@@ -134,7 +175,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-    # Create the Updater and pass it your bot's token.
+    # Create the Updater and pass it your bot token.
     updater = Updater(token=bot_token, use_context=True)
     dispatcher = updater.dispatcher
 
@@ -146,6 +187,12 @@ def main() -> None:
 
     # Start the Bot
     updater.start_polling()
+
+    j: JobQueue = updater.job_queue
+    j.run_daily(check_new_update, days=(0, 1, 2, 3, 4, 5, 6),
+                time=datetime.time(hour=10 - 3, minute=00, second=00))
+
+    j.run_once(check_new_update, 30)
 
     logger.info('Бот работает')
     # Run the bot until the user presses Ctrl-C or the process receives SIGINT,
