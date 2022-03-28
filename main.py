@@ -33,17 +33,20 @@ def get_keyboard_track(barcode, isTracked=False, last_update=''):
 
 
 def send_start_msg(update: Update, context: CallbackContext) -> None:
-    logger.info('Новое сообщение: /start или /help')
+    user_id = update.message.from_user.id
 
-    users.add_user(update.message.from_user.id)
+    logger.info(f'Новое сообщение: /start или /help. пользователь:{user_id}')
+
+    users.add_user(user_id)
 
     update.message.reply_text('Этот бот может отслеживать посылки через сервис Почта России\n'
                               'Чтобы узнать где находится ваша посылка, просто введие номер отправления')
 
 
 def send_track_wait(update: Update, context: CallbackContext) -> None:
-    logger.info('Отправка истории передвижения посылки')
     barcode = update.message.text
+
+    logger.info(f'Отправка истории передвижения посылки. пользователь:{update.effective_user.id}, трек-номер:{barcode}')
 
     message = update.message.reply_text('*Отслеживаю посылку...*', parse_mode=telegram.ParseMode.MARKDOWN)
     send_short_history(barcode, message)
@@ -69,7 +72,7 @@ def send_all_history(update: Update, context: CallbackContext) -> None:
     tracking = RussianPostTracking(barcode, login, password)
     history_track = tracking.get_history()
 
-    logger.info(f'Отправка полной информации о трек-номере. barcode:{barcode}, user:{query.from_user.id}')
+    logger.info(f'Отправка полной информации о трек-номере. трек-номер:{barcode}, пользователь:{query.from_user.id}')
 
     output = format_helper.format_route(history_track, barcode)
     last_update = format_helper.get_last_update(history_track)
@@ -86,7 +89,7 @@ def add_barcode_in_track(update: Update, context: CallbackContext) -> None:
     barcode, last_update = query.data.replace('add_to_tracked_', '').split('_')
     result = users.update_barcode(query.from_user.id, barcode, last_update=last_update)
 
-    logger.info(f'Добавление трек-номера в отслеживаемое. barcode:{barcode}, user:{query.from_user.id}')
+    logger.info(f'Добавление трек-номера в отслеживаемое. трек-номер:{barcode}, пользователь:{query.from_user.id}')
 
     query.edit_message_reply_markup(reply_markup=get_keyboard_track(barcode, isTracked=result))
 
@@ -104,7 +107,7 @@ def remove_barcode_in_track(update: Update, context: CallbackContext) -> None:
 
 
 def send_short_history(barcode, msg):
-    logger.info(f'Отправка базовой информации о трек-номере. barcode:{barcode}, user:{msg.chat_id}')
+    logger.info(f'Отправка базовой информации о трек-номере. трек-номер:{barcode}, пользователь:{msg.chat_id}')
 
     tracking = RussianPostTracking(barcode, login, password)
     history_track = tracking.get_history()
