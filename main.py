@@ -1,4 +1,6 @@
 import datetime
+import json
+
 import telegram
 import logging
 import format_helper
@@ -7,7 +9,9 @@ from russian_post_tracking.soap import RussianPostTracking
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters, CallbackQueryHandler, \
     JobQueue
-from database import UsersDB
+
+import refactor_track
+from database import UsersDB, BarcodesDB
 
 login = os.environ.get('RPT_LOGIN', None)
 password = os.environ.get('RPT_PASSWORD', None)
@@ -18,6 +22,7 @@ logger = logging.getLogger('main')
 logger.setLevel(logger_level)
 
 users = UsersDB('./users.json', logger_level)
+barcodes_db = BarcodesDB('./barcodes.json', logger_level)
 
 
 def get_keyboard_track(barcode, isTracked=False, last_update=''):
@@ -51,8 +56,8 @@ def send_track_wait(update: Update, context: CallbackContext) -> None:
     logger.info(f'Отправка истории передвижения посылки. пользователь:{update.effective_user.id}, трек-номер:{barcode}')
 
     message = update.message.reply_text('*Отслеживаю посылку...*', parse_mode=telegram.ParseMode.MARKDOWN)
-    print(type(message))
-    send_short_history(barcode, message)
+
+    send_short_history(barcode=barcode, msg=message)
 
 
 def route_callback(update: Update, context: CallbackContext) -> None:
@@ -63,7 +68,7 @@ def route_callback(update: Update, context: CallbackContext) -> None:
         return send_all_history(update, context)
     elif 'add_to_tracked_' in query.data:
         return add_barcode_in_track(update, context)
-    elif 'remove_from_tracked' in query.data:
+    elif 'remove_from_tracked_' in query.data:
         return remove_barcode_in_track(update, context)
 
 
@@ -72,10 +77,15 @@ def send_all_history(update: Update, context: CallbackContext) -> None:
     query.answer()
 
     barcode = query.data.replace('show_all_route_', '')
-    tracking = RussianPostTracking(barcode, login, password)
-    history_track = tracking.get_history()
 
     logger.info(f'Отправка полной информации о трек-номере. трек-номер:{barcode}, пользователь:{query.from_user.id}')
+
+    history_track = barcodes_db.get_history_track(barcode)
+
+    if history_track is None:
+        tracking = RussianPostTracking(barcode, login, password)
+        history_track = tracking.get_history()
+        barcodes_db.add_barcode(barcode, history_track)
 
     output = format_helper.format_route(history_track, barcode)
     last_update = format_helper.get_last_update(history_track)
@@ -102,7 +112,7 @@ def remove_barcode_in_track(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     query.answer()
 
-    barcode = query.data.replace('remove_from_tracked', '')
+    barcode = query.data.replace('remove_from_tracked_', '')
     result = not users.update_barcode(query.from_user.id, barcode, remove=True)
 
     logger.info(f'Удаление трек-номера в отслеживаемое. barcode:{barcode}, user:{query.from_user.id}')
@@ -110,39 +120,33 @@ def remove_barcode_in_track(update: Update, context: CallbackContext) -> None:
     query.edit_message_reply_markup(reply_markup=get_keyboard_track(barcode, isTracked=result))
 
 
-def send_short_history(barcode: str, msg: telegram.message.Message):
-    logger.info(f'Отправка базовой информации о трек-номере. трек-номер:{barcode}, пользователь:{msg.chat_id}')
-
-    tracking = RussianPostTracking(barcode, login, password)
-    history_track = tracking.get_history()
-
-    output = format_helper.format_route_short(history_track, barcode)
-    last_update = format_helper.get_last_update(history_track)
-
-    if output is None:
-        return msg.edit_text('*История передвежений посылки не найдена.*', parse_mode=telegram.ParseMode.MARKDOWN)
-
-    isTracked = users.check_barcode(msg.chat_id, barcode)
-    msg.edit_text(output, reply_markup=get_keyboard_track(barcode, isTracked=isTracked, last_update=last_update),
-                  parse_mode=telegram.ParseMode.MARKDOWN)
-
-
-def send_short_history_by_user_id(context: CallbackContext, barcode: str, user_id: int):
+def send_short_history(barcode: str, user_id: int = 0, bot=None, msg: telegram.message.Message = None):
     logger.info(f'Отправка базовой информации о трек-номере. трек-номер:{barcode}, пользователь:{user_id}')
 
-    tracking = RussianPostTracking(barcode, login, password)
-    history_track = tracking.get_history()
+    history_track = barcodes_db.get_history_track(barcode)
+
+    if history_track is None:
+        tracking = RussianPostTracking(barcode, login, password)
+        history_track = refactor_track.convert_to_json(tracking.get_history())
+        barcodes_db.add_barcode(barcode, history_track)
 
     output = format_helper.format_route_short(history_track, barcode)
     last_update = format_helper.get_last_update(history_track)
 
     if output is None:
-        return context.bot.send_message(chat_id=user_id, text='*История передвежений посылки не найдена.*',
-                                        parse_mode=telegram.ParseMode.MARKDOWN)
+        if user_id > 0:
+            return bot.send_message(chat_id=user_id, text='*История передвежений посылки не найдена.*',
+                                    parse_mode=telegram.ParseMode.MARKDOWN)
+        return msg.edit_text('*История передвежений посылки не найдена.*', parse_mode=telegram.ParseMode.MARKDOWN)
 
-    isTracked = users.check_barcode(user_id, barcode)
-    context.bot.send_message(chat_id=user_id, text=output, parse_mode=telegram.ParseMode.MARKDOWN,
-                             reply_markup=get_keyboard_track(barcode, isTracked=isTracked, last_update=last_update))
+    if user_id > 0:
+        isTracked = users.check_barcode(user_id, barcode)
+        return bot.send_message(chat_id=user_id, text=output, parse_mode=telegram.ParseMode.MARKDOWN,
+                                reply_markup=get_keyboard_track(barcode, isTracked=isTracked,
+                                                                last_update=last_update))
+    isTracked = users.check_barcode(msg.chat_id, barcode)
+    return msg.edit_text(output, reply_markup=get_keyboard_track(barcode, isTracked=isTracked, last_update=last_update),
+                         parse_mode=telegram.ParseMode.MARKDOWN)
 
 
 def check_new_update(context: CallbackContext):
@@ -161,13 +165,13 @@ def check_new_update(context: CallbackContext):
                 continue
 
             users.update_barcode(int(user_id), curr_barcode, last_update)
-            send_short_history_by_user_id(context, curr_barcode, int(user_id))
+            send_short_history(barcode=curr_barcode, user_id=int(user_id), bot=context.bot)
 
 
 def error_callback(update: Update, context: CallbackContext):
     error: Exception = context.error
 
-    logger.error(error.__context__)
+    logger.error(error)
     update.message.reply_text('Введите корректный номер')
 
 

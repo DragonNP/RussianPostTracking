@@ -5,8 +5,8 @@ logger = logging.getLogger('format_helper')
 
 
 def get_last_update(history_track):
-    last = len(history_track.historyRecord) - 1
-    history = history_track.historyRecord[last]
+    last = len(history_track['historyRecord']) - 1
+    history = history_track['historyRecord'][last]
 
     last_update = refactor_track.get_date_operation(history)
 
@@ -17,14 +17,14 @@ def format_route_short(history_track, barcode):
     try:
         mass_item = ''
 
-        for i in range(len(history_track.historyRecord) - 1, -1, -1):
-            history = history_track.historyRecord[i]
+        for i in range(len(history_track['historyRecord']) - 1, -1, -1):
+            history = history_track['historyRecord'][i]
             new_mass_item = refactor_track.get_mass_item(history)
             if new_mass_item != 0:
                 mass_item = new_mass_item
 
-        last = len(history_track.historyRecord) - 1
-        history = history_track.historyRecord[last]
+        last = len(history_track['historyRecord']) - 1
+        history = history_track['historyRecord'][last]
         history_travel = get_format(history, only_history=True)
 
         specs = get_specs(barcode, history_track, mass_item)
@@ -39,8 +39,8 @@ def format_route(history_track, barcode):
     mass_item = ''
     history_travel = ''
 
-    for i in range(len(history_track.historyRecord) - 1, -1, -1):
-        history = history_track.historyRecord[i]
+    for i in range(len(history_track['historyRecord']) - 1, -1, -1):
+        history = history_track['historyRecord'][i]
         result = get_format(history)
 
         if result[0] is not None:

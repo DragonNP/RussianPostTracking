@@ -67,7 +67,7 @@ class UsersDB:
 
             barcodes = self.db[str(user_id)]['barcodes']
             if remove or last_update is None:
-                barcodes.remove(curr_barcode)
+                barcodes.pop(curr_barcode)
             else:
                 barcodes[curr_barcode] = last_update
             self.db[str(user_id)]['barcodes'] = barcodes
@@ -98,3 +98,66 @@ class UsersDB:
 
     def get_db(self):
         return self.db
+
+
+class BarcodesDB:
+    logger = logging.getLogger('barcodes_db')
+
+    def __init__(self, location, logger_level):
+        self.db = {}
+        self.logger.setLevel(logger_level)
+        self.logger.debug('Инициализация базы данных трек-номеров')
+
+        self.location = os.path.expanduser(location)
+        self.load(self.location)
+
+    def load(self, location):
+        self.logger.debug('Загрузка базы данных')
+
+        if os.path.exists(location):
+            self.__load()
+        return True
+
+    def __load(self):
+        self.logger.debug('Загрузка базы данных из файлв')
+        self.db = json.load(open(self.location, 'r'))
+
+    def __dump_db(self):
+        self.logger.debug('Сохранение базы данных в файл')
+        try:
+            json.dump(self.db, open(self.location, 'w+'))
+            return True
+        except Exception as e:
+            self.logger.error(e)
+            return False
+
+    def __check_barcode(self, barcode: str):
+        res = barcode in self.db.keys()
+        self.logger.debug(f'Проверка трек-номера в базе данных. результат:{res}')
+        return res
+
+    def add_barcode(self, barcode: str, history_track: json):
+        self.logger.debug(f'Добавление трек-номера. трек-номер:{barcode}')
+
+        try:
+            if self.__check_barcode(barcode):
+                self.logger.debug(f'Трек-номер уже добавлен. трек-номер:{barcode}')
+                return False
+
+            self.db[barcode] = history_track
+            self.__dump_db()
+            return True
+        except Exception as e:
+            self.logger.error(f'Не удалось сохранить трек-номер. трек-номер:{barcode}', e)
+            return False
+
+    def get_history_track(self, barcode: str):
+        try:
+            if not self.__check_barcode(barcode):
+                self.logger.debug(f'Трек-номер не сохранен в базе данных. трек-номер:{barcode}')
+                return None
+
+            return self.db[barcode]
+        except Exception as e:
+            self.logger.error(f'Не удалось получить историю отправлений. трек-номер:{barcode}', e)
+            return None

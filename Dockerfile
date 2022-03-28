@@ -1,9 +1,12 @@
-FROM python:latest
+FROM python:3.9-slim
 
-COPY requirements.txt requirements.txt
+COPY requirements.txt .
 
 RUN pip3 install -r requirements.txt
 
-COPY . .
+COPY refactor_track.py
+COPY format_helper.py
+COPY database.py
+COPY main.py .
 
 CMD ["python", "./main.py"]
