@@ -125,7 +125,7 @@ class BarcodesDB:
     def __dump_db(self):
         self.logger.debug('Сохранение базы данных в файл')
         try:
-            json.dump(self.db, open(self.location, 'w+'))
+            json.dump(self.db, open(self.location, 'w+'), ensure_ascii=False)
             return True
         except Exception as e:
             self.logger.error(e)

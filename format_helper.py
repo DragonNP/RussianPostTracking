@@ -1,89 +1,73 @@
 import logging
-import refactor_track
+from package import Package
 
 logger = logging.getLogger('format_helper')
 
 
-def get_last_update(history_track):
-    last = len(history_track['historyRecord']) - 1
-    history = history_track['historyRecord'][last]
-
-    last_update = refactor_track.get_date_operation(history)
-
-    return last_update
-
-
-def format_route_short(history_track, barcode):
+def format_route_short(package: Package, barcode):
     try:
-        mass_item = ''
+        history_travel = format_history(package.history[-1])
 
-        for i in range(len(history_track['historyRecord']) - 1, -1, -1):
-            history = history_track['historyRecord'][i]
-            new_mass_item = refactor_track.get_mass_item(history)
-            if new_mass_item != 0:
-                mass_item = new_mass_item
-
-        last = len(history_track['historyRecord']) - 1
-        history = history_track['historyRecord'][last]
-        history_travel = get_format(history, only_history=True)
-
-        specs = get_specs(barcode, history_track, mass_item)
+        specs = get_specs(barcode, package, package.mass)
         output = specs + history_travel
         return output
-    except AttributeError:
-        logger.info(f'historyRecord не найден. История передвежний: {history_track}')
+    except Exception as e:
+        logger.error(e)
         return None
 
 
-def format_route(history_track, barcode):
-    mass_item = ''
+def format_route(package: Package, barcode):
     history_travel = ''
 
-    for i in range(len(history_track['historyRecord']) - 1, -1, -1):
-        history = history_track['historyRecord'][i]
-        result = get_format(history)
+    for point in package.history:
+        history_travel += f'{format_history(point)}\n'
 
-        if result[0] is not None:
-            mass_item = result[0]
-        history_travel += result[1] + '\n'
-
-    specs = get_specs(barcode, history_track, mass_item)
+    specs = get_specs(barcode, package, package.mass)
     output = specs + history_travel
 
     return output
 
 
-def get_format(history, only_history=False):
-    history_travel = ''
-    mass_item = None
-    operation_address = refactor_track.get_operation_address(history)
+def format_history(point):
+    formatted_history = ''
 
-    if not only_history:
-        new_mass_item = refactor_track.get_mass_item(history)
-        if new_mass_item != 0:
-            mass_item = new_mass_item
+    if point['Date'] != '':
+        formatted_history += f'*[{point["Date"]}]*: '
+    if point['Status'] != '':
+        formatted_history += point['Status']
 
-    history_travel += '*[' + refactor_track.get_date_operation(history) + ']*: '
-    history_travel += refactor_track.get_operation(history)
-    if operation_address != '':
-        history_travel += ' (' + operation_address + ')'
+    if point['StatusAddress'] != '' and point['StatusIndex'] != '':
+        formatted_history += f' ({point["StatusAddress"]}, {point["StatusIndex"]})'
+    elif point['StatusAddress'] != '' and point['StatusIndex'] == '':
+        formatted_history += f' ({point["StatusAddress"]})'
+    elif point['StatusAddress'] == '' and point['StatusIndex'] != '':
+        formatted_history += f' ({point["StatusIndex"]})'
 
-    if not only_history:
-        return mass_item, history_travel
-    return history_travel
+    return formatted_history
 
 
-def get_specs(barcode, history_track, mass_item):
-    specs = '🛳 Посылка *' + barcode + '*\n\n'
+def get_specs(barcode, package: Package, mass_item: int):
+    if package.name != '':
+        specs = f'🛳 *{package.name}* ({barcode})\n\n'
+    else:
+        specs = f'🛳 Посылка *{barcode}*\n\n'
 
-    route = refactor_track.get_route(history_track)
-    sender = refactor_track.get_sender(history_track)
-    recipient = refactor_track.get_recipient(history_track)
+    sender = package.sender_fullname
+    recipient = package.recipient_fullname
 
-    specs += f'Маршурт: *{route}*\n'
-    specs += f'Отправитель: *{sender}*\n'
-    specs += f'Получатель: *{recipient}*\n'
+    if package.country_from != '' and package.destination_address != '':
+        specs += f'Маршурт: *{package.country_from} → {package.destination_address}*\n'
+    elif package.country_from != '' and package.destination_address == '':
+        specs += f'От: *{package.country_from}*\n'
+    elif package.country_from == '' and package.destination_address != '':
+        specs += f'Прибывает в *{package.destination_address}*\n'
 
-    specs += 'Масса посылки: *' + str(mass_item) + ' гр. *\n\n'
+    if sender != '':
+        specs += f'Отправитель: *{sender}*\n'
+    if recipient != '':
+        specs += f'Получатель: *{recipient}*\n'
+    if mass_item != 0:
+        specs += 'Масса посылки: *' + str(mass_item) + ' гр. *\n'
+    specs += '\n'
 
     return specs
