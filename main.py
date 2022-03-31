@@ -202,11 +202,11 @@ def main() -> None:
     # Start the Bot
     updater.start_polling()
 
-    j: JobQueue = updater.job_queue
-    j.run_daily(check_new_update, days=(0, 1, 2, 3, 4, 5, 6),
-                time=datetime.time(hour=10 - 3, minute=00, second=00))
-
-    j.run_once(check_new_update, 30)
+    # j: JobQueue = updater.job_queue
+    # j.run_daily(check_new_update, days=(0, 1, 2, 3, 4, 5, 6),
+    #             time=datetime.time(hour=10 - 3, minute=00, second=00))
+    #
+    # j.run_once(check_new_update, 30)
 
     logger.info('Бот работает')
     # Run the bot until the user presses Ctrl-C or the process receives SIGINT,
