@@ -17,6 +17,8 @@ class Package:
         else:
             self.__set_variables(features)
 
+
+
     def __transform(self, result_suds):
         _suds = result_suds['historyRecord']
 
@@ -32,7 +34,7 @@ class Package:
                     if 'DestinationAddress' in suds:
                         res['DestinationAddress'] = suds['DestinationAddress']['Description']
 
-                    if 'DestinationAddress' in suds:
+                    if 'DestinationAddress' in suds and 'Index' in suds['DestinationAddress']:
                         res['DestinationIndex'] = suds['DestinationAddress']['Index']
 
                     if 'CountryFrom' in suds:
