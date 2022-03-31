@@ -1,30 +1,20 @@
-import datetime
+from const_variables import *
 import telegram
+import datetime
 import logging
 import format_helper
-import os
-from russian_post_tracking.soap import RussianPostTracking
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters, CallbackQueryHandler, \
     JobQueue
 
-import refactor_track
 from database import UsersDB, BarcodesDB
 from package import Package
 
-login = os.environ.get('RPT_LOGIN', None)
-password = os.environ.get('RPT_PASSWORD', None)
-bot_token = os.environ.get('TELEGRAM_API', None)
-logger_level = os.environ.get('LOGGER_LEVEL', 'INFO')
-
 logger = logging.getLogger('main')
-logger.setLevel(logger_level)
+logger.setLevel(GLOBAL_LOGGER_LEVEL)
 
-users_db_path = './users.json'
-barcodes_db_path = './barcodes.json'
-
-users = UsersDB(users_db_path, logger_level)
-barcodes_db = BarcodesDB(barcodes_db_path, logger_level)
+users = UsersDB()
+barcodes_db = BarcodesDB()
 
 
 def get_keyboard_track(barcode, is_tracked=False, is_show_all_track=True):
@@ -37,9 +27,11 @@ def get_keyboard_track(barcode, is_tracked=False, is_show_all_track=True):
             [InlineKeyboardButton("Показать последнее изменение", callback_data='show_short_route_' + barcode)])
 
     if is_tracked:
-        keyboard.append([InlineKeyboardButton("Перестать отслеживать", callback_data='remove_from_tracked_' + barcode)])
+        keyboard.append([InlineKeyboardButton("Перестать отслеживать",
+                                              callback_data=f'remove_from_tracked_{barcode}_{int(is_show_all_track)}')])
     else:
-        keyboard.append([InlineKeyboardButton("Отслеживать", callback_data=f'add_to_tracked_{barcode}')])
+        keyboard.append(
+            [InlineKeyboardButton("Отслеживать", callback_data=f'add_to_tracked_{barcode}_{int(is_show_all_track)}')])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     return reply_markup
@@ -89,7 +81,7 @@ def send_all_history(update: Update, context: CallbackContext) -> None:
 
     logger.info(f'Отправка полной информации о трек-номере. трек-номер:{barcode}, пользователь:{query.from_user.id}')
 
-    package = Package(barcode, login, password, barcodes_db_path, logger_level)
+    package = Package(barcode)
 
     output = format_helper.format_route(package, barcode)
 
@@ -103,24 +95,28 @@ def add_barcode_in_track(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     query.answer()
 
-    barcode = query.data.replace('add_to_tracked_', '')
+    barcode, is_show_all_track = query.data.replace('add_to_tracked_', '').split('_')
+    is_show_all_track = is_show_all_track == '1'
     result = users.update_barcode(query.from_user.id, barcode)
 
     logger.info(f'Добавление трек-номера в отслеживаемое. трек-номер:{barcode}, пользователь:{query.from_user.id}')
 
-    query.edit_message_reply_markup(reply_markup=get_keyboard_track(barcode, is_tracked=result, is_show_all_track=True))
+    query.edit_message_reply_markup(
+        reply_markup=get_keyboard_track(barcode, is_tracked=result, is_show_all_track=is_show_all_track))
 
 
 def remove_barcode_in_track(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     query.answer()
 
-    barcode = query.data.replace('remove_from_tracked_', '')
+    barcode, is_show_all_track = query.data.replace('remove_from_tracked_', '').split('_')
+    is_show_all_track = is_show_all_track == '1'
     result = not users.update_barcode(query.from_user.id, barcode, remove=True)
 
     logger.info(f'Удаление трек-номера в отслеживаемое. barcode:{barcode}, user:{query.from_user.id}')
 
-    query.edit_message_reply_markup(reply_markup=get_keyboard_track(barcode, is_tracked=result, is_show_all_track=True))
+    query.edit_message_reply_markup(
+        reply_markup=get_keyboard_track(barcode, is_tracked=result, is_show_all_track=is_show_all_track))
 
 
 def edit_msg_send_short_history(update: Update, context: CallbackContext) -> None:
@@ -131,12 +127,12 @@ def edit_msg_send_short_history(update: Update, context: CallbackContext) -> Non
 
     logger.info(f'Отправка базовой информации о трек-номере. трек-номер:{barcode}, пользователь:{query.from_user.id}')
 
-    package = Package(barcode, login, password, barcodes_db_path, logger_level)
+    package = Package(barcode)
     output = format_helper.format_route_short(package, barcode)
 
     is_tracked = users.check_barcode(query.from_user.id, barcode)
     query.edit_message_text(text=output,
-                            reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked, is_show_all_track=False),
+                            reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked, is_show_all_track=True),
                             parse_mode=telegram.ParseMode.MARKDOWN)
 
 
@@ -144,7 +140,7 @@ def send_short_history(barcode: str, user_id: int = 0, bot=None, msg: telegram.m
     logger.info(
         f'Отправка базовой информации о трек-номере. трек-номер:{barcode}, пользователь:{user_id if user_id > 0 else msg.chat_id}')
 
-    package = Package(barcode, login, password, barcodes_db_path, logger_level)
+    package = Package(barcode)
 
     output = format_helper.format_route_short(package, barcode)
 
@@ -165,20 +161,27 @@ def send_short_history(barcode: str, user_id: int = 0, bot=None, msg: telegram.m
 
 
 def check_new_update(context: CallbackContext):
-    database = users.get_db()
+    _users = users.db
+    _packages = barcodes_db.db
+    _new_packages = {}
 
-    for user_id in database:
-        barcodes = database[user_id]['barcodes']
+    for user_id in _users:
+        barcodes = _users[user_id]['barcodes']
 
         for curr_barcode in barcodes:
-            tracking = RussianPostTracking(curr_barcode, login, password)
-            history_track = refactor_track.convert_to_json(tracking.get_history())
-
-            if history_track == barcodes_db.get_history_track(curr_barcode):
+            if curr_barcode in _new_packages:
+                send_short_history(curr_barcode, int(user_id), context.bot)
                 continue
 
-            barcodes_db.update_history_track(curr_barcode, history_track)
-            send_short_history(barcode=curr_barcode, user_id=int(user_id), bot=context.bot)
+            updated_package = Package.from_rpt(curr_barcode)
+            if curr_barcode in _packages and updated_package.features == _packages[curr_barcode]:
+                continue
+
+            _new_packages[curr_barcode] = updated_package.features
+            send_short_history(curr_barcode, int(user_id), context.bot)
+
+    if _new_packages != {}:
+        barcodes_db.save_packages(_new_packages)
 
 
 def error_callback(update: Update, context: CallbackContext):
@@ -193,7 +196,7 @@ def main() -> None:
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
     # Create the Updater and pass it your bot token.
-    updater = Updater(token=bot_token, use_context=True)
+    updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
     dispatcher = updater.dispatcher
 
     dispatcher.add_handler(CommandHandler('start', send_start_msg))
@@ -205,11 +208,11 @@ def main() -> None:
     # Start the Bot
     updater.start_polling()
 
-    # j: JobQueue = updater.job_queue
-    # j.run_daily(check_new_update, days=(0, 1, 2, 3, 4, 5, 6),
-    #             time=datetime.time(hour=10 - 3, minute=00, second=00))
-    #
-    # j.run_once(check_new_update, 30)
+    j: JobQueue = updater.job_queue
+    j.run_daily(check_new_update, days=(0, 1, 2, 3, 4, 5, 6),
+                time=datetime.time(hour=10 - 3, minute=00, second=00))
+
+    j.run_once(check_new_update, 2)
 
     logger.info('Бот работает')
     # Run the bot until the user presses Ctrl-C or the process receives SIGINT,

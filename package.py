@@ -1,23 +1,49 @@
 from russian_post_tracking.soap import RussianPostTracking
-import logging
 from database import BarcodesDB
+from const_variables import *
 
 
 class Package:
     logger = logging.getLogger('package')
 
-    def __init__(self, barcode_number, rpt_login, rpt_password, path_db, logger_level):
-        self.db = BarcodesDB(path_db, logger_level)
-        features = self.db.get_history_track(barcode_number)
+    def __init__(self, barcode_number):
+        self.db = BarcodesDB()
+        features = self.db.get_package(barcode_number)
 
         if features is None:
-            result_suds = RussianPostTracking(barcode_number, rpt_login, rpt_password).get_history()
-            self.__transform(result_suds)
+            result_suds = RussianPostTracking(barcode_number, RPT_LOGIN, RPT_PASSWORD).get_history()
+            res = Package.suds_to_json(result_suds)
+            self.__set_variables(res)
             self.db.add_barcode(barcode_number, self.features)
         else:
             self.__set_variables(features)
 
-    def __transform(self, result_suds):
+    @classmethod
+    def from_suds(cls, suds, barcode_number):
+        features = Package.suds_to_json(suds)
+
+        cls.barcode = barcode_number
+        cls.features = features
+        cls.history = features['History']
+        cls.mass = features['Mass']
+        cls.sender_fullname = features['SenderFullName']
+        cls.recipient_fullname = features['RecipientFullName']
+        cls.destination_address = features['DestinationAddress']
+        cls.destination_index = features['DestinationIndex']
+        cls.sender_address = features['SenderAddress']
+        cls.country_from = features['CountryFrom']
+        cls.country_to = features['CountryTo']
+        cls.name = features['Name']
+
+        return cls
+
+    @classmethod
+    def from_rpt(cls, barcode_number):
+        result_suds = RussianPostTracking(barcode_number, RPT_LOGIN, RPT_PASSWORD).get_history()
+        return Package.from_suds(result_suds, barcode_number)
+
+    @staticmethod
+    def suds_to_json(result_suds):
         _suds = result_suds['historyRecord']
 
         res = {'History': [], 'Mass': 0, 'SenderFullName': '', 'RecipientFullName': '', 'DestinationAddress': '',
@@ -86,7 +112,10 @@ class Package:
 
             res['History'].append(curr_point)
 
-        self.__set_variables(res)
+        return res
+
+    def save(self):
+        self.db.update_package(self.barcode, self.features)
 
     def __set_variables(self, features):
         self.features = features

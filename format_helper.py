@@ -20,7 +20,7 @@ def format_route(package: Package, barcode):
     history_travel = ''
 
     for point in package.history:
-        history_travel += f'{format_history(point)}\n'
+        history_travel = f'{format_history(point)}\n' + history_travel
 
     specs = get_specs(barcode, package, package.mass)
     output = specs + history_travel
