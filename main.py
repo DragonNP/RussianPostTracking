@@ -180,8 +180,7 @@ def check_new_update(context: CallbackContext):
             _new_packages[curr_barcode] = updated_package.features
             send_short_history(curr_barcode, int(user_id), context.bot)
 
-    if _new_packages != {}:
-        barcodes_db.save_packages(_new_packages)
+    barcodes_db.save_packages(_new_packages)
 
 
 def error_callback(update: Update, context: CallbackContext):
