@@ -59,7 +59,8 @@ def send_start_msg(update: Update, context: CallbackContext) -> None:
 def send_track_wait(update: Update, context: CallbackContext) -> None:
     barcode = update.message.text
 
-    logger.info(f'Отправка истории передвижения посылки. пользователь:{update.effective_user.id}, трек-номер:{barcode}')
+    logger.info(
+        f'Отправка истории передвижения посылки. пользователь:{update.effective_user.link}, трек-номер:{barcode}')
 
     message = update.message.reply_text('*Отслеживаю посылку...*', parse_mode=telegram.ParseMode.MARKDOWN)
 

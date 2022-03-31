@@ -17,8 +17,6 @@ class Package:
         else:
             self.__set_variables(features)
 
-
-
     def __transform(self, result_suds):
         _suds = result_suds['historyRecord']
 
