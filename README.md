@@ -2,6 +2,8 @@
 
 Telegram bot for tracking shipments via the Russian Post API.
 
+Use and test) http://t.me/russian_post_tracking_bot
+
 ## Example
 
 <img src="/images/example.gif" width="50%">
