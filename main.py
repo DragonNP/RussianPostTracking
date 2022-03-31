@@ -33,7 +33,8 @@ def get_keyboard_track(barcode, is_tracked=False, is_show_all_track=True):
     if is_show_all_track:
         keyboard.append([InlineKeyboardButton("Показать полный путь", callback_data='show_all_route_' + barcode)])
     else:
-        keyboard.append([InlineKeyboardButton("Показать последнее изменение", callback_data='show_short_route_' + barcode)])
+        keyboard.append(
+            [InlineKeyboardButton("Показать последнее изменение", callback_data='show_short_route_' + barcode)])
 
     if is_tracked:
         keyboard.append([InlineKeyboardButton("Перестать отслеживать", callback_data='remove_from_tracked_' + barcode)])
@@ -106,7 +107,7 @@ def add_barcode_in_track(update: Update, context: CallbackContext) -> None:
 
     logger.info(f'Добавление трек-номера в отслеживаемое. трек-номер:{barcode}, пользователь:{query.from_user.id}')
 
-    query.edit_message_reply_markup(reply_markup=get_keyboard_track(barcode, is_tracked=result))
+    query.edit_message_reply_markup(reply_markup=get_keyboard_track(barcode, is_tracked=result, is_show_all_track=True))
 
 
 def remove_barcode_in_track(update: Update, context: CallbackContext) -> None:
@@ -118,7 +119,7 @@ def remove_barcode_in_track(update: Update, context: CallbackContext) -> None:
 
     logger.info(f'Удаление трек-номера в отслеживаемое. barcode:{barcode}, user:{query.from_user.id}')
 
-    query.edit_message_reply_markup(reply_markup=get_keyboard_track(barcode, is_tracked=result))
+    query.edit_message_reply_markup(reply_markup=get_keyboard_track(barcode, is_tracked=result, is_show_all_track=True))
 
 
 def edit_msg_send_short_history(update: Update, context: CallbackContext) -> None:
@@ -155,9 +156,10 @@ def send_short_history(barcode: str, user_id: int = 0, bot=None, msg: telegram.m
     if user_id > 0:
         is_tracked = users.check_barcode(user_id, barcode)
         return bot.send_message(chat_id=user_id, text=output, parse_mode=telegram.ParseMode.MARKDOWN,
-                                reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked))
+                                reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked, is_show_all_track=True))
     is_tracked = users.check_barcode(msg.chat_id, barcode)
-    return msg.edit_text(output, reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked),
+    return msg.edit_text(output,
+                         reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked, is_show_all_track=True),
                          parse_mode=telegram.ParseMode.MARKDOWN)
 
 
