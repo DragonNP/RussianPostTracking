@@ -12,8 +12,8 @@ from database import UsersDB, BarcodesDB
 logger = logging.getLogger('main')
 logger.setLevel(GLOBAL_LOGGER_LEVEL)
 
-users = USERS_DATABASE = UsersDB()
-barcodes_db = BARCODES_DATABASE = BarcodesDB()
+users = UsersDB()
+barcodes_db = BarcodesDB()
 
 
 def get_keyboard_track(barcode, is_tracked=False, is_show_all_track=True):
