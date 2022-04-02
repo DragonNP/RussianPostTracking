@@ -167,6 +167,7 @@ def check_new_update(context: CallbackContext):
     _users = users.db
     _packages = barcodes_db.db
     _new_packages = {}
+    _new_version_old_packages = {}
 
     for user_id in _users:
         barcodes = _users[user_id]['barcodes']
@@ -179,13 +180,16 @@ def check_new_update(context: CallbackContext):
                 continue
 
             updated_package = Package.from_rpt(curr_barcode)
-            if curr_barcode in _packages and updated_package.features == _packages[curr_barcode]:
+            if curr_barcode in _packages and updated_package.history == _packages[curr_barcode]['History']:
+                if updated_package.features != _packages[curr_barcode]:
+                    _new_version_old_packages[curr_barcode] = updated_package.features
+
                 continue
 
             _new_packages[curr_barcode] = updated_package.features
             send_new_package(barcode=curr_barcode, package=updated_package, user_id=int(user_id),
                              bot=context.bot)
-
+    _new_packages.update(_new_version_old_packages)
     barcodes_db.save_packages(_new_packages)
 
 
@@ -218,7 +222,7 @@ def main() -> None:
     j.run_daily(check_new_update, days=(0, 1, 2, 3, 4, 5, 6),
                 time=datetime.time(hour=10, minute=00, second=00))
 
-    j.run_once(check_new_update, 30)
+    j.run_once(check_new_update, 2)
 
     logger.info('Бот работает')
     # Run the bot until the user presses Ctrl-C or the process receives SIGINT,
