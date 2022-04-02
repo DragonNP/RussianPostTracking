@@ -93,7 +93,7 @@ def send_all_history(update: Update, context: CallbackContext) -> None:
 
     barcode = query.data.replace('show_all_route_', '')
 
-    logger.info(f'Отправка полной информации о трек-номере. трек-номер:{barcode}, пользователь:{query.from_user.id}')
+    logger.debug(f'Отправка полной информации о трек-номере. трек-номер:{barcode}, пользователь:{query.from_user.id}')
 
     package = Package(barcode)
 
@@ -130,7 +130,7 @@ def add_barcode_in_track(update: Update, context: CallbackContext) -> None:
     is_show_all_track = is_show_all_track == '1'
     result = users.update_barcode(query.from_user.id, barcode)
 
-    logger.info(f'Добавление трек-номера в отслеживаемое. трек-номер:{barcode}, пользователь:{query.from_user.id}')
+    logger.debug(f'Добавление трек-номера в отслеживаемое. трек-номер:{barcode}, пользователь:{query.from_user.id}')
 
     query.edit_message_reply_markup(
         reply_markup=get_keyboard_track(barcode, is_tracked=result, is_show_all_track=is_show_all_track))
@@ -144,14 +144,14 @@ def remove_barcode_in_track(update: Update, context: CallbackContext) -> None:
     is_show_all_track = is_show_all_track == '1'
     result = not users.update_barcode(query.from_user.id, barcode, remove=True)
 
-    logger.info(f'Удаление трек-номера в отслеживаемое. barcode:{barcode}, user:{query.from_user.id}')
+    logger.debug(f'Удаление трек-номера в отслеживаемое. barcode:{barcode}, user:{query.from_user.id}')
 
     query.edit_message_reply_markup(
         reply_markup=get_keyboard_track(barcode, is_tracked=result, is_show_all_track=is_show_all_track))
 
 
 def send_new_package(barcode: str, package: Package, user_id: int, bot):
-    logger.info(
+    logger.debug(
         f'Отправка нового обновления. трек-номер:{barcode}, пользователь:{user_id}')
 
     output = format_helper.format_route_short(package, barcode)
@@ -162,6 +162,8 @@ def send_new_package(barcode: str, package: Package, user_id: int, bot):
 
 
 def check_new_update(context: CallbackContext):
+    logger.info('Началась проверка новый обновлений')
+
     _users = users.db
     _packages = barcodes_db.db
     _new_packages = {}
