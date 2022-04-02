@@ -39,6 +39,9 @@ class UsersDB:
             self.logger.error(e)
             return False
 
+    def save(self):
+        self.__dump_db()
+
     def add_user(self, user_id):
         self.logger.debug(f'Создание пользователя. id пользователя:{user_id}')
 
@@ -54,7 +57,7 @@ class UsersDB:
             self.logger.error(f'Не удалось сохранить пользователя. id пользователя:{user_id}', e)
             return False
 
-    def update_barcode(self, user_id: int, curr_barcode: str, remove=False):
+    def update_barcode(self, user_id: int, curr_barcode: str, remove=False, save=True):
         self.logger.debug(
             f'Обновление трек-номера. id пользователя:{user_id}, '
             f'новый трек-номер:{curr_barcode}, удалить={remove}')
@@ -66,12 +69,15 @@ class UsersDB:
                 self.add_user(user_id)
 
             barcodes: list = self.db[str(user_id)]['barcodes']
+
             if remove:
                 barcodes.remove(curr_barcode)
             else:
                 barcodes.append(curr_barcode)
+
             self.db[str(user_id)]['barcodes'] = barcodes
-            self.__dump_db()
+            if save:
+                self.__dump_db()
             return True
         except Exception as e:
             self.logger.error(
@@ -94,6 +100,21 @@ class UsersDB:
         except Exception as e:
             self.logger.error(
                 f'Не удалось проверить трек-номер. id пользователя:{user_id}, новый трек-номер:{curr_barcode}', e)
+            return False
+
+    def get_barcodes(self, user_id: int):
+        self.logger.debug(f'Получение всех трек-номеров. id пользователя:{user_id}')
+
+        try:
+            user_in_db = self.__check_user(user_id)
+            if not user_in_db:
+                self.logger.debug(f'Пользователь не найден. id пользователя:{user_id}')
+                self.add_user(user_id)
+
+            return self.db[str(user_id)]['barcodes']
+        except Exception as e:
+            self.logger.error(
+                f'Не удалось получить все трек-номера. id пользователя:{user_id}', e)
             return False
 
 

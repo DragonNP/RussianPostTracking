@@ -3,18 +3,16 @@ import telegram
 import datetime
 import logging
 import format_helper
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters, CallbackQueryHandler, \
     JobQueue
-
-from database import UsersDB, BarcodesDB
 from package import Package
 
 logger = logging.getLogger('main')
 logger.setLevel(GLOBAL_LOGGER_LEVEL)
 
-users = UsersDB()
-barcodes_db = BarcodesDB()
+users = USERS_DATABASE
+barcodes_db = BARCODES_DATABASE
 
 
 def get_keyboard_track(barcode, is_tracked=False, is_show_all_track=True):
@@ -37,6 +35,20 @@ def get_keyboard_track(barcode, is_tracked=False, is_show_all_track=True):
     return reply_markup
 
 
+def get_keyboard_my_packages():
+    keyboard = [['Показать отслеживаемое']]
+
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    return reply_markup
+
+
+def get_keyboard_remove_delivered():
+    keyboard = [[InlineKeyboardButton('Удалить доставленные', callback_data='remove_delivered')]]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    return reply_markup
+
+
 def send_start_msg(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
 
@@ -46,7 +58,9 @@ def send_start_msg(update: Update, context: CallbackContext) -> None:
 
     update.message.reply_text('Этот бот может отслеживать посылки через сервис Почта России\n'
                               'Чтобы узнать где находится ваша посылка, просто введие номер отправления.\n'
-                              'Техподдержка: телеграм t.me/dragon_np почта: dragonnp@yandex.ru')
+                              'Техподдержка: телеграм t.me/dragon_np почта: dragonnp@yandex.ru',
+                              reply_markup=get_keyboard_my_packages(),
+                              disable_web_page_preview=True)
 
 
 def send_package(update: Update, context: CallbackContext) -> None:
@@ -62,7 +76,7 @@ def send_package(update: Update, context: CallbackContext) -> None:
     logger.info(
         f'Отправка истории передвижения посылки. пользователь:{__user}, трек-номер:{barcode}')
 
-    message = update.message.reply_text('*Отслеживаю посылку...*', parse_mode=telegram.ParseMode.MARKDOWN)
+    message = update.message.reply_text('🛳*Отслеживаю посылку...*', parse_mode=telegram.ParseMode.MARKDOWN)
 
     package = Package(barcode)
     output = format_helper.format_route_short(package, barcode)
@@ -85,6 +99,8 @@ def route_callback(update: Update, context: CallbackContext) -> None:
         return add_barcode_in_track(update, context)
     elif 'remove_from_tracked_' in query.data:
         return remove_barcode_in_track(update, context)
+    elif 'remove_delivered' in query.data:
+        return remove_delivered(update, context)
 
 
 def send_all_history(update: Update, context: CallbackContext) -> None:
@@ -161,6 +177,74 @@ def send_new_package(barcode: str, package: Package, user_id: int, bot):
                             reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked, is_show_all_track=True))
 
 
+def get_text_my_packages(user_id: int):
+    text = '🛳*Отслеживаемые посылки*\n\n'
+    barcodes = users.get_barcodes(user_id)
+    for curr_barcode in barcodes:
+        package = Package(curr_barcode)
+
+        history = format_helper.format_history(package.history[-1])
+        if not history[0]:
+            return 'Error', history[1]
+        text += f'*{package.name} ({curr_barcode})*\n{history}\n\n'
+    return text
+
+
+def send_my_packages(update: Update, context: CallbackContext) -> None:
+    user_id = update.effective_user.id
+
+    if update.effective_user.link is not None:
+        __user = update.effective_user.link
+    elif update.effective_user.full_name is not None and update.effective_user.full_name != '':
+        __user = update.effective_user.full_name
+    else:
+        __user = update.effective_user.id
+
+    logger.info(
+        f'Отправка всех отправлений:{__user}')
+
+    text = get_text_my_packages(user_id)
+
+    if text[0] == 'Error':
+        context.error = text[1]
+        return error_callback(update, context)
+
+    update.message.reply_text(text,
+                              parse_mode=telegram.ParseMode.MARKDOWN,
+                              reply_markup=get_keyboard_remove_delivered())
+
+
+def remove_delivered(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    query.answer()
+    user_id = query.from_user.id
+
+    logger.debug(f'Удаление доставленных посылок. пользователь:{user_id}')
+
+    edit_message = False
+    barcodes = users.get_barcodes(user_id)
+    for curr_barcode in barcodes:
+        package = Package(curr_barcode)
+        if package.is_delivered:
+            users.update_barcode(user_id, curr_barcode, remove=True, save=False)
+            edit_message = True
+    users.save()
+
+    text = get_text_my_packages(user_id)
+
+    if text[0] == 'Error':
+        context.error = text[1]
+        return error_callback(update, context)
+
+    if not edit_message:
+        logger.debug(f'Доставленных посылок не обнаружено. пользователь:{user_id}')
+        return
+
+    query.edit_message_text(text,
+                            parse_mode=telegram.ParseMode.MARKDOWN,
+                            reply_markup=get_keyboard_remove_delivered())
+
+
 def check_new_update(context: CallbackContext):
     logger.info('Началась проверка новый обновлений')
 
@@ -198,7 +282,10 @@ def error_callback(update: Update, context: CallbackContext):
 
     logger.error(error)
     update.message.reply_text(
-        'Произошла ошибка. Пожалуйста, свяжитесь со мной через телеграм t.me/dragon_np или через почту dragonnp@yandex.ru')
+        'Произошла ошибка. '
+        'Пожалуйста, свяжитесь со мной через телеграм t.me/dragon_np или через почту dragonnp@yandex.ru',
+        reply_markup=get_keyboard_my_packages(),
+        disable_web_page_preview=True)
 
 
 def main() -> None:
@@ -211,6 +298,7 @@ def main() -> None:
 
     dispatcher.add_handler(CommandHandler('start', send_start_msg))
     dispatcher.add_handler(CommandHandler('help', send_start_msg))
+    dispatcher.add_handler(MessageHandler(Filters.text('Показать отслеживаемое'), send_my_packages))
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, send_package))
     dispatcher.add_handler(CallbackQueryHandler(route_callback))
     dispatcher.add_error_handler(error_callback)
@@ -222,7 +310,7 @@ def main() -> None:
     j.run_daily(check_new_update, days=(0, 1, 2, 3, 4, 5, 6),
                 time=datetime.time(hour=10, minute=00, second=00))
 
-    j.run_once(check_new_update, 2)
+    j.run_once(check_new_update, 30)
 
     logger.info('Бот работает')
     # Run the bot until the user presses Ctrl-C or the process receives SIGINT,

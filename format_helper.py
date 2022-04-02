@@ -29,20 +29,24 @@ def format_route(package: Package, barcode):
 
 
 def format_history(point):
-    formatted_history = ''
+    try:
+        formatted_history = ''
 
-    if point['Date'] != '':
-        formatted_history += f'*[{point["Date"]}]*: '
-    if point['Status'] != '':
-        formatted_history += point['Status']
+        if point['Date'] != '':
+            formatted_history += f'*[{point["Date"]}]*: '
+        if point['Status'] != '':
+            formatted_history += point['Status']
 
-    if point['StatusAddress'] != '' and point['StatusIndex'] != '':
-        formatted_history += f' ({point["StatusAddress"]}, {point["StatusIndex"]})'
-    elif point['StatusAddress'] != '' and point['StatusIndex'] == '':
-        formatted_history += f' ({point["StatusAddress"]})'
-    elif point['StatusAddress'] == '' and point['StatusIndex'] != '':
-        formatted_history += f' ({point["StatusIndex"]})'
-    return formatted_history
+        if point['StatusAddress'] != '' and point['StatusIndex'] != '':
+            formatted_history += f' ({point["StatusAddress"]}, {point["StatusIndex"]})'
+        elif point['StatusAddress'] != '' and point['StatusIndex'] == '':
+            formatted_history += f' ({point["StatusAddress"]})'
+        elif point['StatusAddress'] == '' and point['StatusIndex'] != '':
+            formatted_history += f' ({point["StatusIndex"]})'
+        return formatted_history
+    except Exception as e:
+        logger.error(e)
+        return False, e
 
 
 def get_specs(barcode, package: Package):

@@ -1,5 +1,4 @@
 from russian_post_tracking.soap import RussianPostTracking
-from database import BarcodesDB
 from const_variables import *
 
 
@@ -7,7 +6,7 @@ class Package:
     logger = logging.getLogger('package')
 
     def __init__(self, barcode_number):
-        self.db = BarcodesDB()
+        self.db = BARCODES_DATABASE
         features = self.db.get_package(barcode_number)
 
         if features is None:
@@ -38,6 +37,7 @@ class Package:
         cls.country_to = features['CountryTo']
         cls.name = features['Name']
         cls.price = features['Price']
+        cls.is_delivered = features['IsDelivered']
 
         return cls
 
@@ -51,7 +51,8 @@ class Package:
         _suds = result_suds['historyRecord']
 
         res = {'History': [], 'Mass': 0, 'SenderFullName': '', 'RecipientFullName': '', 'DestinationAddress': '',
-               'DestinationIndex': '', 'SenderAddress': '', 'CountryFrom': '', 'CountryTo': '', 'Name': '', 'Price': 0}
+               'DestinationIndex': '', 'SenderAddress': '', 'CountryFrom': '', 'CountryTo': '', 'Name': '', 'Price': 0,
+               'IsDelivered': False}
 
         for point in _suds:
 
@@ -89,7 +90,10 @@ class Package:
                         res['Mass'] = int(suds['Mass'])
 
                 if key[0] == 'OperationParameters':
-                    if 'OperAttr' in suds and 'Name' in suds['OperAttr']:
+                    if 'Id' in suds['OperType'] and suds['OperType']['Id'] == 2:
+                        res['IsDelivered'] = True
+
+                    if 'Name' in suds['OperAttr']:
                         curr_point['Status'] = suds['OperAttr']['Name']
                     elif 'OperType' in suds and 'Name' in suds['OperType']:
                         curr_point['Status'] = suds['OperType']['Name']
@@ -131,3 +135,4 @@ class Package:
         self.country_to = features['CountryTo']
         self.name = features['Name']
         self.price = features['Price']
+        self.is_delivered = features['IsDelivered']
