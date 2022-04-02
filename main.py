@@ -45,7 +45,8 @@ def send_start_msg(update: Update, context: CallbackContext) -> None:
     users.add_user(user_id)
 
     update.message.reply_text('Этот бот может отслеживать посылки через сервис Почта России\n'
-                              'Чтобы узнать где находится ваша посылка, просто введие номер отправления')
+                              'Чтобы узнать где находится ваша посылка, просто введие номер отправления.\n'
+                              'Техподдержка: телеграм t.me/dragon_np почта: dragonnp@yandex.ru')
 
 
 def send_package(update: Update, context: CallbackContext) -> None:
@@ -190,7 +191,8 @@ def error_callback(update: Update, context: CallbackContext):
     error: Exception = context.error
 
     logger.error(error)
-    update.message.reply_text('Введите корректный номер')
+    update.message.reply_text(
+        'Произошла ошибка. Пожалуйста, свяжитесь со мной через телеграм t.me/dragon_np или через почту dragonnp@yandex.ru')
 
 
 def main() -> None:
