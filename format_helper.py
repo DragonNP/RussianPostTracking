@@ -69,12 +69,34 @@ def get_specs(barcode, package: Package):
     if recipient != '':
         specs += f'Получатель: *{recipient}*\n'
     if mass != 0:
-        specs += f'Масса посылки: *{mass} гр. *\n'
+        specs += f'Масса посылки: *{format_mass(mass)}*\n'
     if price != 0:
         specs += f'Объявленная ценность: *{format_price(price)}*\n'
     specs += '\n'
 
     return specs
+
+
+def format_mass(mass: int):
+    kg = mass // 1000
+    gr = mass % 1000
+
+    if kg > 0:
+        res = str(kg)
+
+        if gr > 0:
+            if gr > 99:
+                if gr % 10 > 4:
+                    res += f',{gr // 10 + 1}'
+                else:
+                    res += f',{gr // 10}'
+            else:
+                res += f',{gr}'
+        res += ' кг.'
+    else:
+        res = f'{gr} гр.'
+
+    return res
 
 
 def format_price(price: int):
