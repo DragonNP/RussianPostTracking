@@ -200,3 +200,7 @@ class BarcodesDB:
         except Exception as e:
             self.logger.error(f'Не удалось сохранить историю передвижений трек-номера. трек-номер:{barcode}', e)
             return False
+
+
+USERS_DB = UsersDB()
+BARCODES_DB = BarcodesDB()

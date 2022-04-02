@@ -7,13 +7,13 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKe
 from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters, CallbackQueryHandler, \
     JobQueue
 from package import Package
-from database import UsersDB, BarcodesDB
+from database import USERS_DB, BARCODES_DB
 
 logger = logging.getLogger('main')
 logger.setLevel(GLOBAL_LOGGER_LEVEL)
 
-users = UsersDB()
-barcodes_db = BarcodesDB()
+users = USERS_DB
+barcodes_db = BARCODES_DB
 
 
 def get_keyboard_track(barcode, is_tracked=False, is_show_all_track=True):

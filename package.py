@@ -1,12 +1,13 @@
 from russian_post_tracking.soap import RussianPostTracking
 from const_variables import *
-from database import BarcodesDB
+from database import BARCODES_DB
+
 
 class Package:
     logger = logging.getLogger('package')
 
     def __init__(self, barcode_number):
-        self.db = BarcodesDB()
+        self.db = BARCODES_DB
         features = self.db.get_package(barcode_number)
 
         if features is None:
