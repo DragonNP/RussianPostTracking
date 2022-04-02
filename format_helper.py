@@ -42,7 +42,6 @@ def format_history(point):
         formatted_history += f' ({point["StatusAddress"]})'
     elif point['StatusAddress'] == '' and point['StatusIndex'] != '':
         formatted_history += f' ({point["StatusIndex"]})'
-
     return formatted_history
 
 

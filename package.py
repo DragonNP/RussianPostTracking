@@ -55,7 +55,7 @@ class Package:
 
         for point in _suds:
 
-            curr_point = {}
+            curr_point = {'StatusAddress': '', 'StatusIndex': '', 'Status': '', 'Date': ''}
             for key in point:
                 suds = key[1]
                 if key[0] == 'AddressParameters':
@@ -74,15 +74,12 @@ class Package:
                     if 'CountryOper' in suds:
                         res['CountryTo'] = suds['CountryOper']['NameRU']
 
-                    if 'OperationAddress' in suds:
+                    if 'OperationAddress' in suds and 'Description' in suds['OperationAddress'] and \
+                            suds['OperationAddress']['Description'] is not None:
                         curr_point['StatusAddress'] = suds['OperationAddress']['Description']
-                    else:
-                        curr_point['StatusAddress'] = ''
 
                     if 'OperationAddress' in suds and 'Index' in suds['OperationAddress']:
                         curr_point['StatusIndex'] = suds['OperationAddress']['Index']
-                    else:
-                        curr_point['StatusIndex'] = ''
 
                 if key[0] == 'ItemParameters':
                     if 'ComplexItemName' in suds:
@@ -96,13 +93,9 @@ class Package:
                         curr_point['Status'] = suds['OperAttr']['Name']
                     elif 'OperType' in suds and 'Name' in suds['OperType']:
                         curr_point['Status'] = suds['OperType']['Name']
-                    else:
-                        curr_point['Status'] = ''
 
                     if 'OperDate' in suds:
                         curr_point['Date'] = suds['OperDate'].strftime('%d.%m.%Y %H:%M')
-                    else:
-                        curr_point['Date'] = ''
 
                     if 'Mass' in suds:
                         res['Mass'] = int(suds['Mass'])
