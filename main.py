@@ -216,7 +216,7 @@ def main() -> None:
     j.run_daily(check_new_update, days=(0, 1, 2, 3, 4, 5, 6),
                 time=datetime.time(hour=10 - 3, minute=00, second=00))
 
-    j.run_once(check_new_update, 2)
+    #j.run_once(check_new_update, 2)
 
     logger.info('Бот работает')
     # Run the bot until the user presses Ctrl-C or the process receives SIGINT,

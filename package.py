@@ -37,6 +37,7 @@ class Package:
         cls.country_from = features['CountryFrom']
         cls.country_to = features['CountryTo']
         cls.name = features['Name']
+        cls.price = features['Price']
 
         return cls
 
@@ -50,7 +51,7 @@ class Package:
         _suds = result_suds['historyRecord']
 
         res = {'History': [], 'Mass': 0, 'SenderFullName': '', 'RecipientFullName': '', 'DestinationAddress': '',
-               'DestinationIndex': '', 'SenderAddress': '', 'CountryFrom': '', 'CountryTo': '', 'Name': ''}
+               'DestinationIndex': '', 'SenderAddress': '', 'CountryFrom': '', 'CountryTo': '', 'Name': '', 'Price': 0}
 
         for point in _suds:
 
@@ -113,6 +114,10 @@ class Package:
                     if 'Rcpn' in suds and not (suds['Rcpn'] is None):
                         res['RecipientFullName'] = suds['Rcpn']
 
+                if key[0] == 'FinanceParameters':
+                    if 'Value' in suds:
+                        res['Price'] = int(suds['Value'])
+
             res['History'].append(curr_point)
 
         return res
@@ -132,3 +137,4 @@ class Package:
         self.country_from = features['CountryFrom']
         self.country_to = features['CountryTo']
         self.name = features['Name']
+        self.price = features['Price']

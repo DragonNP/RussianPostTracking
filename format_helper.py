@@ -8,7 +8,7 @@ def format_route_short(package: Package, barcode):
     try:
         history_travel = format_history(package.history[-1])
 
-        specs = get_specs(barcode, package, package.mass)
+        specs = get_specs(barcode, package)
         output = specs + history_travel
         return output
     except Exception as e:
@@ -22,7 +22,7 @@ def format_route(package: Package, barcode):
     for point in package.history:
         history_travel = f'{format_history(point)}\n' + history_travel
 
-    specs = get_specs(barcode, package, package.mass)
+    specs = get_specs(barcode, package)
     output = specs + history_travel
 
     return output
@@ -46,7 +46,7 @@ def format_history(point):
     return formatted_history
 
 
-def get_specs(barcode, package: Package, mass_item: int):
+def get_specs(barcode, package: Package):
     if package.name != '':
         specs = f'🛳 *{package.name}* ({barcode})\n\n'
     else:
@@ -54,6 +54,8 @@ def get_specs(barcode, package: Package, mass_item: int):
 
     sender = package.sender_fullname
     recipient = package.recipient_fullname
+    mass = package.mass
+    price = package.price
 
     if package.country_from != '' and package.destination_address != '':
         specs += f'Маршурт: *{package.country_from} → {package.destination_address}*\n'
@@ -66,8 +68,25 @@ def get_specs(barcode, package: Package, mass_item: int):
         specs += f'Отправитель: *{sender}*\n'
     if recipient != '':
         specs += f'Получатель: *{recipient}*\n'
-    if mass_item != 0:
-        specs += 'Масса посылки: *' + str(mass_item) + ' гр. *\n'
+    if mass != 0:
+        specs += f'Масса посылки: *{mass} гр. *\n'
+    if price != 0:
+        specs += f'Объявленная ценность: *{format_price(price)}*\n'
     specs += '\n'
 
     return specs
+
+
+def format_price(price: int):
+    rubles = price // 100
+    kopecks = price % 100
+
+    res = '{:,.0f}'.format(rubles).replace(',', ' ')
+    if kopecks > 0:
+        if kopecks < 10:
+            res += f',0{kopecks}'
+        else:
+            res += f',{kopecks}'
+    res += ' руб.'
+
+    return res
