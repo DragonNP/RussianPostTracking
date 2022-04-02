@@ -7,12 +7,13 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKe
 from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters, CallbackQueryHandler, \
     JobQueue
 from package import Package
+from database import UsersDB, BarcodesDB
 
 logger = logging.getLogger('main')
 logger.setLevel(GLOBAL_LOGGER_LEVEL)
 
-users = USERS_DATABASE
-barcodes_db = BARCODES_DATABASE
+users = USERS_DATABASE = UsersDB()
+barcodes_db = BARCODES_DATABASE = BarcodesDB()
 
 
 def get_keyboard_track(barcode, is_tracked=False, is_show_all_track=True):
@@ -57,7 +58,7 @@ def send_start_msg(update: Update, context: CallbackContext) -> None:
     users.add_user(user_id)
 
     update.message.reply_text('Этот бот может отслеживать посылки через сервис Почта России\n'
-                              'Чтобы узнать где находится ваша посылка, просто введие номер отправления.\n'
+                              'Чтобы узнать где находится ваша посылка, просто введите номер отправления.\n'
                               'Техподдержка: телеграм t.me/dragon_np почта: dragonnp@yandex.ru',
                               reply_markup=get_keyboard_my_packages(),
                               disable_web_page_preview=True)
