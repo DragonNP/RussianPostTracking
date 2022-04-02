@@ -48,15 +48,28 @@ def send_start_msg(update: Update, context: CallbackContext) -> None:
                               'Чтобы узнать где находится ваша посылка, просто введие номер отправления')
 
 
-def send_track_wait(update: Update, context: CallbackContext) -> None:
+def send_package(update: Update, context: CallbackContext) -> None:
     barcode = update.message.text
 
+    if update.effective_user.link is not None:
+        __user = update.effective_user.link
+    elif update.effective_user.full_name is not None and update.effective_user.full_name != '':
+        __user = update.effective_user.full_name
+    else:
+        __user = update.effective_user.id
+
     logger.info(
-        f'Отправка истории передвижения посылки. пользователь:{update.effective_user.link}, трек-номер:{barcode}')
+        f'Отправка истории передвижения посылки. пользователь:{__user}, трек-номер:{barcode}')
 
     message = update.message.reply_text('*Отслеживаю посылку...*', parse_mode=telegram.ParseMode.MARKDOWN)
 
-    send_short_history(barcode=barcode, msg=message)
+    package = Package(barcode)
+    output = format_helper.format_route_short(package, barcode)
+    is_tracked = users.check_barcode(message.chat_id, barcode)
+
+    message.edit_text(output,
+                      reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked, is_show_all_track=True),
+                      parse_mode=telegram.ParseMode.MARKDOWN)
 
 
 def route_callback(update: Update, context: CallbackContext) -> None:
@@ -66,7 +79,7 @@ def route_callback(update: Update, context: CallbackContext) -> None:
     if 'show_all_route_' in query.data:
         return send_all_history(update, context)
     elif 'show_short_route_' in query.data:
-        return edit_msg_send_short_history(update, context)
+        return all_history_to_short(update, context)
     elif 'add_to_tracked_' in query.data:
         return add_barcode_in_track(update, context)
     elif 'remove_from_tracked_' in query.data:
@@ -88,6 +101,23 @@ def send_all_history(update: Update, context: CallbackContext) -> None:
     isTracked = users.check_barcode(query.from_user.id, barcode)
     query.edit_message_text(text=output,
                             reply_markup=get_keyboard_track(barcode, is_tracked=isTracked, is_show_all_track=False),
+                            parse_mode=telegram.ParseMode.MARKDOWN)
+
+
+def all_history_to_short(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    query.answer()
+
+    barcode = query.data.replace('show_short_route_', '')
+
+    logger.debug(f'Отправка базовой информации о трек-номере. пользователь:{query.from_user.id}, трек-номер:{barcode}')
+
+    package = Package(barcode)
+    output = format_helper.format_route_short(package, barcode)
+    is_tracked = users.check_barcode(query.from_user.id, barcode)
+
+    query.edit_message_text(text=output,
+                            reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked, is_show_all_track=True),
                             parse_mode=telegram.ParseMode.MARKDOWN)
 
 
@@ -119,45 +149,15 @@ def remove_barcode_in_track(update: Update, context: CallbackContext) -> None:
         reply_markup=get_keyboard_track(barcode, is_tracked=result, is_show_all_track=is_show_all_track))
 
 
-def edit_msg_send_short_history(update: Update, context: CallbackContext) -> None:
-    query = update.callback_query
-    query.answer()
-
-    barcode = query.data.replace('show_short_route_', '')
-
-    logger.info(f'Отправка базовой информации о трек-номере. трек-номер:{barcode}, пользователь:{query.from_user.id}')
-
-    package = Package(barcode)
-    output = format_helper.format_route_short(package, barcode)
-
-    is_tracked = users.check_barcode(query.from_user.id, barcode)
-    query.edit_message_text(text=output,
-                            reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked, is_show_all_track=True),
-                            parse_mode=telegram.ParseMode.MARKDOWN)
-
-
-def send_short_history(barcode: str, user_id: int = 0, bot=None, msg: telegram.message.Message = None):
+def send_new_package(barcode: str, package: Package, user_id: int, bot):
     logger.info(
-        f'Отправка базовой информации о трек-номере. трек-номер:{barcode}, пользователь:{user_id if user_id > 0 else msg.chat_id}')
-
-    package = Package(barcode)
+        f'Отправка нового обновления. трек-номер:{barcode}, пользователь:{user_id}')
 
     output = format_helper.format_route_short(package, barcode)
+    is_tracked = users.check_barcode(user_id, barcode)
 
-    if output is None:
-        if user_id > 0:
-            return bot.send_message(chat_id=user_id, text='*История передвежений посылки не найдена.*',
-                                    parse_mode=telegram.ParseMode.MARKDOWN)
-        return msg.edit_text('*История передвежений посылки не найдена.*', parse_mode=telegram.ParseMode.MARKDOWN)
-
-    if user_id > 0:
-        is_tracked = users.check_barcode(user_id, barcode)
-        return bot.send_message(chat_id=user_id, text=output, parse_mode=telegram.ParseMode.MARKDOWN,
-                                reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked, is_show_all_track=True))
-    is_tracked = users.check_barcode(msg.chat_id, barcode)
-    return msg.edit_text(output,
-                         reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked, is_show_all_track=True),
-                         parse_mode=telegram.ParseMode.MARKDOWN)
+    return bot.send_message(chat_id=user_id, text=output, parse_mode=telegram.ParseMode.MARKDOWN,
+                            reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked, is_show_all_track=True))
 
 
 def check_new_update(context: CallbackContext):
@@ -170,7 +170,9 @@ def check_new_update(context: CallbackContext):
 
         for curr_barcode in barcodes:
             if curr_barcode in _new_packages:
-                send_short_history(curr_barcode, int(user_id), context.bot)
+                package = Package.from_json(_new_packages[curr_barcode], curr_barcode)
+                send_new_package(barcode=curr_barcode, package=package, user_id=int(user_id),
+                                 bot=context.bot)
                 continue
 
             updated_package = Package.from_rpt(curr_barcode)
@@ -178,7 +180,8 @@ def check_new_update(context: CallbackContext):
                 continue
 
             _new_packages[curr_barcode] = updated_package.features
-            send_short_history(curr_barcode, int(user_id), context.bot)
+            send_new_package(barcode=curr_barcode, package=updated_package, user_id=int(user_id),
+                             bot=context.bot)
 
     barcodes_db.save_packages(_new_packages)
 
@@ -200,7 +203,7 @@ def main() -> None:
 
     dispatcher.add_handler(CommandHandler('start', send_start_msg))
     dispatcher.add_handler(CommandHandler('help', send_start_msg))
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, send_track_wait))
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, send_package))
     dispatcher.add_handler(CallbackQueryHandler(route_callback))
     dispatcher.add_error_handler(error_callback)
 

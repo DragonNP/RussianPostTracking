@@ -21,7 +21,10 @@ class Package:
     @classmethod
     def from_suds(cls, suds, barcode_number):
         features = Package.suds_to_json(suds)
+        return cls.from_json(features, barcode_number)
 
+    @classmethod
+    def from_json(cls, features, barcode_number):
         cls.barcode = barcode_number
         cls.features = features
         cls.history = features['History']
