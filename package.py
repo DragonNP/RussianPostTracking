@@ -1,13 +1,15 @@
 from russian_post_tracking.soap import RussianPostTracking
 from const_variables import *
-from database import BARCODES_DB
+from database import BarcodesDB
+
+barcodes_db = BarcodesDB()
 
 
 class Package:
     logger = logging.getLogger('package')
 
     def __init__(self, barcode_number):
-        self.db = BARCODES_DB
+        self.db = barcodes_db
         features = self.db.get_package(barcode_number)
 
         if features is None:
@@ -119,6 +121,14 @@ class Package:
             res['History'].append(curr_point)
 
         return res
+
+    @staticmethod
+    def get_saved_packages():
+        return barcodes_db
+
+    @staticmethod
+    def save_new_packages(packages):
+        return barcodes_db.save_packages(packages)
 
     def save(self):
         self.db.update_package(self.barcode, self.features)

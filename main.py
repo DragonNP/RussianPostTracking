@@ -7,14 +7,16 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKe
 from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters, CallbackQueryHandler, \
     JobQueue
 from package import Package
-from database import USERS_DB, BARCODES_DB
+from database import UsersDB
 from texts import *
+
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 logger = logging.getLogger('main')
 logger.setLevel(GLOBAL_LOGGER_LEVEL)
 
-users = USERS_DB
-barcodes_db = BARCODES_DB
+users = UsersDB()
 
 
 def get_keyboard_track(barcode, is_tracked=False, is_show_all_track=True):
@@ -82,7 +84,7 @@ def send_package(update: Update, context: CallbackContext) -> None:
     output = format_helper.format_route_short(package, barcode)
     is_tracked = users.check_barcode(message.chat_id, barcode)
 
-    message.edit_text(output,
+    message.edit_text(text=output,
                       reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked, is_show_all_track=True),
                       parse_mode=telegram.ParseMode.MARKDOWN)
 
@@ -249,7 +251,7 @@ def check_new_update(context: CallbackContext):
     logger.info('Началась проверка новый обновлений')
 
     _users = users.db
-    _packages = barcodes_db.db
+    _packages = Package.get_saved_packages()
     _new_packages = {}
     _new_version_old_packages = {}
 
@@ -274,22 +276,20 @@ def check_new_update(context: CallbackContext):
             send_new_package(barcode=curr_barcode, package=updated_package, user_id=int(user_id),
                              bot=context.bot)
     _new_packages.update(_new_version_old_packages)
-    barcodes_db.save_packages(_new_packages)
+    Package.save_new_packages(_new_packages)
 
 
 def error_callback(update: Update, context: CallbackContext):
     error: Exception = context.error
 
-    logger.error(error)
-    update.message.reply_text(TEXT_ERROR,
-                              reply_markup=get_keyboard_my_packages(),
-                              disable_web_page_preview=True)
+    logger.error(error, exc_info=True)
+    if update.message is not None:
+        update.message.reply_text(TEXT_ERROR,
+                                  reply_markup=get_keyboard_my_packages(),
+                                  disable_web_page_preview=True)
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO,
-                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
     # Create the Updater and pass it your bot token.
     updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
     dispatcher = updater.dispatcher
