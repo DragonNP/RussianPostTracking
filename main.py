@@ -8,6 +8,7 @@ from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandle
     JobQueue
 from package import Package
 from database import USERS_DB, BARCODES_DB
+from texts import *
 
 logger = logging.getLogger('main')
 logger.setLevel(GLOBAL_LOGGER_LEVEL)
@@ -57,9 +58,7 @@ def send_start_msg(update: Update, context: CallbackContext) -> None:
 
     users.add_user(user_id)
 
-    update.message.reply_text('Этот бот может отслеживать посылки через сервис Почта России\n'
-                              'Чтобы узнать где находится ваша посылка, просто введите номер отправления.\n'
-                              'Техподдержка: телеграм t.me/dragon_np почта: dragonnp@yandex.ru',
+    update.message.reply_text(TEXT_START,
                               reply_markup=get_keyboard_my_packages(),
                               disable_web_page_preview=True)
 
@@ -282,11 +281,9 @@ def error_callback(update: Update, context: CallbackContext):
     error: Exception = context.error
 
     logger.error(error)
-    update.message.reply_text(
-        'Произошла ошибка. '
-        'Пожалуйста, свяжитесь со мной через телеграм t.me/dragon_np или через почту dragonnp@yandex.ru',
-        reply_markup=get_keyboard_my_packages(),
-        disable_web_page_preview=True)
+    update.message.reply_text(TEXT_ERROR,
+                              reply_markup=get_keyboard_my_packages(),
+                              disable_web_page_preview=True)
 
 
 def main() -> None:
