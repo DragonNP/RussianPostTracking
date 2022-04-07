@@ -4,9 +4,8 @@ from database import BarcodesDB
 
 barcodes_db = BarcodesDB()
 
-
+logger = logging.getLogger('package')
 class Package:
-    logger = logging.getLogger('package')
 
     def __init__(self, barcode_number):
         self.db = barcodes_db
@@ -51,12 +50,15 @@ class Package:
 
     @staticmethod
     def suds_to_json(result_suds):
-        _suds = result_suds['historyRecord']
-
         res = {'History': [], 'Mass': 0, 'SenderFullName': '', 'RecipientFullName': '', 'DestinationAddress': '',
                'DestinationIndex': '', 'SenderAddress': '', 'CountryFrom': '', 'CountryTo': '', 'Name': '', 'Price': 0,
                'IsDelivered': False}
 
+        if not ('historyRecord' in result_suds):
+            logger.debug('Результат запроса пустой')
+            return res
+
+        _suds = result_suds['historyRecord']
         for point in _suds:
 
             curr_point = {'StatusAddress': '', 'StatusIndex': '', 'Status': '', 'Date': ''}
@@ -124,7 +126,7 @@ class Package:
 
     @staticmethod
     def get_saved_packages():
-        return barcodes_db
+        return barcodes_db.db
 
     @staticmethod
     def save_new_packages(packages):

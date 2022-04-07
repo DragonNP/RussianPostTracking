@@ -1,4 +1,5 @@
 import json
+
 from const_variables import *
 
 
@@ -11,18 +12,22 @@ class UsersDB:
         self.logger.debug('Инициализация базы данных пользователей')
 
         self.location = os.path.expanduser(PATH_TO_USERS_DATA_BASE)
-        self.load(self.location)
-
-    def load(self, location):
-        self.logger.debug('Загрузка базы данных')
-
-        if os.path.exists(location):
-            self.__load()
-        return True
+        self.__load()
 
     def __load(self):
-        self.logger.debug('Загрузка базы данных из файлв')
-        self.db = json.load(open(self.location, 'r'))
+        self.logger.debug('Загрузка базы данных')
+
+        if os.path.exists(self.location):
+            self.logger.debug('Загрузка базы данных из файлв')
+            self.db = json.load(open(self.location, 'r'))
+
+        for user_id in self.db:
+            if isinstance(self.db[user_id]['barcodes'], list):
+                print('Hi')
+                new = {}
+                for barcode in self.db[user_id]['barcodes']:
+                    new[barcode] = {'Name': '', 'Tracked': True}
+                self.db[user_id]['barcodes'] = new
 
     def __check_user(self, user_id: int):
         res = str(user_id) in self.db.keys()
@@ -33,7 +38,7 @@ class UsersDB:
 
         self.logger.debug('Сохранение базы данных в файл')
         try:
-            json.dump(self.db, open(self.location, 'w+'))
+            json.dump(self.db, open(self.location, 'w+'), ensure_ascii=False)
             return True
         except Exception as e:
             self.logger.error(e)
@@ -50,39 +55,115 @@ class UsersDB:
                 self.logger.debug(f'Пользователь уже создан. id пользователя:{user_id}')
                 return False
 
-            self.db[str(user_id)] = {'barcodes': []}
+            self.db[str(user_id)] = {'barcodes': {}}
             self.__dump_db()
             return True
         except Exception as e:
             self.logger.error(f'Не удалось сохранить пользователя. id пользователя:{user_id}', e)
             return False
 
-    def update_barcode(self, user_id: int, curr_barcode: str, remove=False, save=True):
-        self.logger.debug(
-            f'Обновление трек-номера. id пользователя:{user_id}, '
-            f'новый трек-номер:{curr_barcode}, удалить={remove}')
+    def add_barcode(self, user_id: int, curr_barcode: str, name: str = '', tracked=False, save=True):
+        log_vars = f'id пользователя:{user_id}, новый трек-номер:{curr_barcode}, ' \
+                   f'имя:{name}, отслеживаемое:{tracked}, сохранить:{save}'
+
+        self.logger.debug(f'Добавление нового трек-номера. {log_vars}')
+        try:
+            user_in_db = self.__check_user(user_id)
+            if not user_in_db:
+                self.logger.debug(f'Пользователь не найден. id пользователя:{user_id}')
+                self.add_user(user_id)
+            if curr_barcode in self.db[str(user_id)]['barcodes']:
+                self.logger.debug('Трек-номер уже добавлен')
+                return False
+
+            self.db[str(user_id)]['barcodes'][curr_barcode] = {'Name': name, 'Tracked': tracked}
+
+            if save:
+                self.__dump_db()
+            return True
+        except Exception as e:
+            self.logger.error(f'Не удалось добавить трек-номер', e, exc_info=True)
+            return False
+
+    def get_package_specs(self, user_id: int, barcode: str) -> (bool, str):
+        log_vars = f'id пользователя:{user_id}, трек-номер:{barcode}'
+
+        self.logger.debug(f'Получение название посылки и отслеживается ли она. {log_vars}')
+        try:
+            user_in_db = self.__check_user(user_id)
+            if not user_in_db:
+                self.logger.debug(f'Пользователь не найден. id пользователя:{user_id}')
+                self.add_user(user_id)
+                return False, ''
+            if not (barcode in self.db[str(user_id)]['barcodes']):
+                return False, ''
+
+            tracked: bool = self.db[str(user_id)]['barcodes'][barcode]['Tracked']
+            name: str = self.db[str(user_id)]['barcodes'][barcode]['Name']
+
+            return tracked, name
+        except Exception as e:
+            self.logger.error(f'Не удалось добавить трек-номер', e, exc_info=True)
+            return False, ''
+
+    def update_barcode(self, user_id: int, curr_barcode: str, name: str = '', tracked: bool = None, save: bool = True):
+        log_vars = f'id пользователя:{user_id}, новый трек-номер:{curr_barcode}, ' \
+                   f'имя:{name}, отслеживаемое:{tracked}, сохранить:{save}'
+
+        self.logger.debug(f'Добавление обновление трек-номера. {log_vars}')
 
         try:
             user_in_db = self.__check_user(user_id)
             if not user_in_db:
                 self.logger.debug(f'Пользователь не найден. id пользователя:{user_id}')
                 self.add_user(user_id)
+                return False
 
-            barcodes: list = self.db[str(user_id)]['barcodes']
+            barcode = self.db[str(user_id)]['barcodes'][curr_barcode]
 
-            if remove:
-                barcodes.remove(curr_barcode)
-            else:
-                barcodes.append(curr_barcode)
+            update = False
+            if name != '':
+                barcode['Name'] = name
+                update = True
+            if tracked is not None:
+                barcode['Tracked'] = tracked
+                update = True
 
-            self.db[str(user_id)]['barcodes'] = barcodes
+            if not update:
+                return False
+
+            self.db[str(user_id)]['barcodes'][curr_barcode] = barcode
+
             if save:
                 self.__dump_db()
             return True
         except Exception as e:
+            self.logger.error(f'Не удалось обновить трек-номер. {log_vars}', e)
+            return False
+
+    def rename_barcode(self, user_id: int, barcode: str, name: str):
+        log_vars = f'пользователь:{user_id}, трек-номер:{barcode}, новое имя:{name}'
+        self.logger.debug(
+            f'Изменение имени трек-номера. {log_vars}')
+
+        try:
+            user_in_db = self.__check_user(user_id)
+            if not user_in_db:
+                self.logger.debug(f'Пользователь не найден. id пользователя:{user_id}')
+                self.add_user(user_id)
+                return False
+            if not (barcode in self.db[str(user_id)]['barcodes']):
+                self.logger.debug(
+                    f'Трек-номер не сохранён в базе пользователей. {log_vars}')
+                return self.add_barcode(user_id=user_id, curr_barcode=barcode, name=name)
+
+            self.db[str(user_id)]['barcodes'][barcode]['Name'] = name
+            self.save()
+            return True
+        except Exception as e:
             self.logger.error(
-                f'Не удалось обновить трек-номер. '
-                f'id пользователя:{user_id}, новый трек-номер:{curr_barcode}, удалить={remove}', e)
+                f'Не удалось изменить имя трек-номера. {log_vars}',
+                e)
             return False
 
     def check_barcode(self, user_id: int, curr_barcode: str):

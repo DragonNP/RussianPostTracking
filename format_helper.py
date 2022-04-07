@@ -4,11 +4,11 @@ from package import Package
 logger = logging.getLogger('format_helper')
 
 
-def format_route_short(package: Package, barcode):
+def format_route_short(package: Package, barcode, custom_name=''):
     try:
         history_travel = format_history(package.history[-1])
 
-        specs = get_specs(barcode, package)
+        specs = get_specs(barcode, package, custom_name=custom_name)
         output = specs + history_travel
         return output
     except Exception as e:
@@ -49,11 +49,15 @@ def format_history(point):
         return False, e
 
 
-def get_specs(barcode, package: Package):
-    if package.name != '':
-        specs = f'🛳 *{package.name}* ({barcode})\n\n'
+def get_specs(barcode, package: Package, custom_name: str = ''):
+    specs = '🛳 '
+    if custom_name != '':
+        specs += f'*{custom_name}* ({barcode})'
+    elif package.name != '':
+        specs = f'*{package.name}* ({barcode})'
     else:
-        specs = f'🛳 Посылка *{barcode}*\n\n'
+        specs = f'Посылка *{barcode}*'
+    specs += '\n\n'
 
     sender = package.sender_fullname
     recipient = package.recipient_fullname

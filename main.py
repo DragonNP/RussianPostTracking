@@ -1,3 +1,5 @@
+from typing import Optional
+
 from const_variables import *
 import telegram
 import datetime
@@ -5,7 +7,7 @@ import logging
 import format_helper
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters, CallbackQueryHandler, \
-    JobQueue
+    JobQueue, ConversationHandler
 from package import Package
 from database import UsersDB
 from texts import *
@@ -18,22 +20,26 @@ logger.setLevel(GLOBAL_LOGGER_LEVEL)
 
 users = UsersDB()
 
+EDIT_NAME = range(1)
+
 
 def get_keyboard_track(barcode, is_tracked=False, is_show_all_track=True):
     keyboard = []
 
     if is_show_all_track:
-        keyboard.append([InlineKeyboardButton("Показать полный путь", callback_data='show_all_route_' + barcode)])
+        keyboard.append([InlineKeyboardButton('Показать полный путь', callback_data='show_all_route_' + barcode)])
     else:
         keyboard.append(
-            [InlineKeyboardButton("Показать последнее изменение", callback_data='show_short_route_' + barcode)])
+            [InlineKeyboardButton('Показать последнее изменение', callback_data='show_short_route_' + barcode)])
+
+    keyboard.append([InlineKeyboardButton('Редактировать название', callback_data='edit_name_' + barcode)])
 
     if is_tracked:
-        keyboard.append([InlineKeyboardButton("Перестать отслеживать",
+        keyboard.append([InlineKeyboardButton('Перестать отслеживать',
                                               callback_data=f'remove_from_tracked_{barcode}_{int(is_show_all_track)}')])
     else:
         keyboard.append(
-            [InlineKeyboardButton("Отслеживать", callback_data=f'add_to_tracked_{barcode}_{int(is_show_all_track)}')])
+            [InlineKeyboardButton('Отслеживать', callback_data=f'add_to_tracked_{barcode}_{int(is_show_all_track)}')])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     return reply_markup
@@ -53,6 +59,13 @@ def get_keyboard_remove_delivered():
     return reply_markup
 
 
+def get_keyboard_rename():
+    keyboard = [[InlineKeyboardButton('Назад', callback_data='back')]]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    return reply_markup
+
+
 def send_start_msg(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
 
@@ -67,13 +80,14 @@ def send_start_msg(update: Update, context: CallbackContext) -> None:
 
 def send_package(update: Update, context: CallbackContext) -> None:
     barcode = update.message.text
+    user_id = update.effective_user.id
 
     if update.effective_user.link is not None:
         __user = update.effective_user.link
     elif update.effective_user.full_name is not None and update.effective_user.full_name != '':
         __user = update.effective_user.full_name
     else:
-        __user = update.effective_user.id
+        __user = user_id
 
     logger.info(
         f'Отправка истории передвижения посылки. пользователь:{__user}, трек-номер:{barcode}')
@@ -81,22 +95,24 @@ def send_package(update: Update, context: CallbackContext) -> None:
     message = update.message.reply_text('🛳*Отслеживаю посылку...*', parse_mode=telegram.ParseMode.MARKDOWN)
 
     package = Package(barcode)
-    output = format_helper.format_route_short(package, barcode)
-    is_tracked = users.check_barcode(message.chat_id, barcode)
+
+    is_tracked, name = users.get_package_specs(user_id, barcode)
+    output = format_helper.format_route_short(package, barcode, custom_name=name)
 
     message.edit_text(text=output,
                       reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked, is_show_all_track=True),
                       parse_mode=telegram.ParseMode.MARKDOWN)
 
 
-def route_callback(update: Update, context: CallbackContext) -> None:
+def route_callback(update: Update, context: CallbackContext) -> Optional[range]:
     query = update.callback_query
-    query.answer()
 
     if 'show_all_route_' in query.data:
         return send_all_history(update, context)
     elif 'show_short_route_' in query.data:
         return all_history_to_short(update, context)
+    elif 'edit_name_' in query.data:
+        return start_rename_package(update, context)
     elif 'add_to_tracked_' in query.data:
         return add_barcode_in_track(update, context)
     elif 'remove_from_tracked_' in query.data:
@@ -140,15 +156,80 @@ def all_history_to_short(update: Update, context: CallbackContext) -> None:
                             parse_mode=telegram.ParseMode.MARKDOWN)
 
 
+def start_rename_package(update: Update, context: CallbackContext) -> range:
+    query = update.callback_query
+    query.answer()
+
+    barcode = query.data.replace('edit_name_', '')
+    user_id = query.from_user.id
+
+    logger.debug(f'Изменение названия посылки. пользователь:{user_id}, трек-номер:{barcode}')
+
+    output = 'Введите название для этой посылки'
+
+    context.user_data['rename_barcode'] = barcode
+    context.user_data['msg_id'] = query.message.message_id
+    query.edit_message_text(text=output,
+                            reply_markup=get_keyboard_rename())
+    return EDIT_NAME
+
+
+def cancel_rename_package(update: Update, context: CallbackContext) -> None:
+    user_id = update.effective_user.id
+    barcode = context.user_data['rename_barcode']
+    message_id = context.user_data['msg_id']
+
+    del context.user_data['rename_barcode']
+    del context.user_data['msg_id']
+
+    logger.debug(f'Название посылки не было изменено. пользователь:{user_id}')
+
+    package = Package(barcode)
+
+    is_tracked, name = users.get_package_specs(user_id, barcode)
+    output = format_helper.format_route_short(package, barcode, custom_name=name)
+
+    context.bot.edit_message_text(text=output,
+                                  chat_id=user_id,
+                                  message_id=message_id,
+                                  parse_mode=telegram.ParseMode.MARKDOWN,
+                                  reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked,
+                                                                  is_show_all_track=True))
+
+    return ConversationHandler.END
+
+
+def end_rename_package(update: Update, context: CallbackContext) -> None:
+    user_id = update.message.chat_id
+    name = update.message.text
+    barcode = context.user_data['rename_barcode']
+    del context.user_data['rename_barcode']
+
+    users.rename_barcode(user_id, barcode, name)
+
+    logger.debug(f'Название посылки изменено. пользователь:{user_id}, имя:{name}, трек-номер:{barcode}')
+
+    update.message.reply_text('Название посылки изменено', reply_markup=get_keyboard_my_packages())
+
+    return ConversationHandler.END
+
+
 def add_barcode_in_track(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     query.answer()
 
+    user_id = query.from_user.id
+
     barcode, is_show_all_track = query.data.replace('add_to_tracked_', '').split('_')
     is_show_all_track = is_show_all_track == '1'
-    result = users.update_barcode(query.from_user.id, barcode)
 
-    logger.debug(f'Добавление трек-номера в отслеживаемое. трек-номер:{barcode}, пользователь:{query.from_user.id}')
+    already_added = users.check_barcode(user_id=user_id, curr_barcode=barcode)
+    if already_added:
+        result = users.update_barcode(user_id=user_id, curr_barcode=barcode, tracked=True, save=True)
+    else:
+        result = users.add_barcode(user_id=user_id, curr_barcode=barcode, name='', tracked=True, save=True)
+
+    logger.debug(f'Добавление трек-номера в отслеживаемое. трек-номер:{barcode}, пользователь:{user_id}')
 
     query.edit_message_reply_markup(
         reply_markup=get_keyboard_track(barcode, is_tracked=result, is_show_all_track=is_show_all_track))
@@ -158,11 +239,13 @@ def remove_barcode_in_track(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     query.answer()
 
+    user_id = query.from_user.id
+
     barcode, is_show_all_track = query.data.replace('remove_from_tracked_', '').split('_')
     is_show_all_track = is_show_all_track == '1'
-    result = not users.update_barcode(query.from_user.id, barcode, remove=True)
+    result = not users.update_barcode(user_id=user_id, curr_barcode=barcode, tracked=False)
 
-    logger.debug(f'Удаление трек-номера в отслеживаемое. barcode:{barcode}, user:{query.from_user.id}')
+    logger.debug(f'Удаление трек-номера в отслеживаемое. barcode:{barcode}, user:{user_id}')
 
     query.edit_message_reply_markup(
         reply_markup=get_keyboard_track(barcode, is_tracked=result, is_show_all_track=is_show_all_track))
@@ -183,12 +266,18 @@ def get_text_my_packages(user_id: int):
     text = '🛳*Отслеживаемые посылки*\n\n'
     barcodes = users.get_barcodes(user_id)
     for curr_barcode in barcodes:
+        if not barcodes[curr_barcode]['Tracked']:
+            continue
+
         package = Package(curr_barcode)
+
+        custom_name = users.get_package_specs(user_id, curr_barcode)[1]
+        parcel_name = custom_name if custom_name else package.name
 
         history = format_helper.format_history(package.history[-1])
         if not history[0]:
             return 'Error', history[1]
-        text += f'*{package.name} ({curr_barcode})*\n{history}\n\n'
+        text += f'*{parcel_name} ({curr_barcode})*\n{history}\n\n'
     return text
 
 
@@ -228,7 +317,7 @@ def remove_delivered(update: Update, context: CallbackContext) -> None:
     for curr_barcode in barcodes:
         package = Package(curr_barcode)
         if package.is_delivered:
-            users.update_barcode(user_id, curr_barcode, remove=True, save=False)
+            users.update_barcode(user_id=user_id, curr_barcode=curr_barcode, tracked=False, save=False)
             edit_message = True
     users.save()
 
@@ -259,6 +348,9 @@ def check_new_update(context: CallbackContext):
         barcodes = _users[user_id]['barcodes']
 
         for curr_barcode in barcodes:
+            if not barcodes[curr_barcode]['Tracked']:
+                continue
+
             if curr_barcode in _new_packages:
                 package = Package.from_json(_new_packages[curr_barcode], curr_barcode)
                 send_new_package(barcode=curr_barcode, package=package, user_id=int(user_id),
@@ -296,6 +388,15 @@ def main() -> None:
 
     dispatcher.add_handler(CommandHandler('start', send_start_msg))
     dispatcher.add_handler(CommandHandler('help', send_start_msg))
+
+    conv_handler = ConversationHandler(
+        entry_points=[CallbackQueryHandler(route_callback)],
+        states={
+            EDIT_NAME: [MessageHandler(Filters.text & ~Filters.command, end_rename_package)]
+        },
+        fallbacks=[CallbackQueryHandler(cancel_rename_package, pattern='back')],
+    )
+    dispatcher.add_handler(conv_handler)
     dispatcher.add_handler(MessageHandler(Filters.text('Показать отслеживаемое'), send_my_packages))
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, send_package))
     dispatcher.add_handler(CallbackQueryHandler(route_callback))
@@ -308,7 +409,7 @@ def main() -> None:
     j.run_daily(check_new_update, days=(0, 1, 2, 3, 4, 5, 6),
                 time=datetime.time(hour=10, minute=00, second=00))
 
-    j.run_once(check_new_update, 30)
+    #j.run_once(check_new_update, 30)
 
     logger.info('Бот работает')
     # Run the bot until the user presses Ctrl-C or the process receives SIGINT,
