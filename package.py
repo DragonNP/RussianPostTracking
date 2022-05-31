@@ -5,6 +5,8 @@ from database import BarcodesDB
 barcodes_db = BarcodesDB()
 
 logger = logging.getLogger('package')
+
+
 class Package:
 
     def __init__(self, barcode_number):

@@ -125,17 +125,17 @@ def send_all_history(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     query.answer()
 
+    user_id = query.from_user.id
     barcode = query.data.replace('show_all_route_', '')
 
-    logger.debug(f'Отправка полной информации о трек-номере. трек-номер:{barcode}, пользователь:{query.from_user.id}')
+    logger.debug(f'Отправка полной информации о трек-номере. трек-номер:{barcode}, пользователь:{user_id}')
 
     package = Package(barcode)
+    is_tracked, name = users.get_package_specs(user_id, barcode)
+    output = format_helper.format_route(package, barcode, custom_name=name)
 
-    output = format_helper.format_route(package, barcode)
-
-    isTracked = users.check_barcode(query.from_user.id, barcode)
     query.edit_message_text(text=output,
-                            reply_markup=get_keyboard_track(barcode, is_tracked=isTracked, is_show_all_track=False),
+                            reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked, is_show_all_track=False),
                             parse_mode=telegram.ParseMode.MARKDOWN)
 
 
@@ -143,13 +143,14 @@ def all_history_to_short(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     query.answer()
 
+    user_id = query.from_user.id
     barcode = query.data.replace('show_short_route_', '')
 
-    logger.debug(f'Отправка базовой информации о трек-номере. пользователь:{query.from_user.id}, трек-номер:{barcode}')
+    logger.debug(f'Отправка базовой информации о трек-номере. пользователь:{user_id}, трек-номер:{barcode}')
 
     package = Package(barcode)
-    output = format_helper.format_route_short(package, barcode)
-    is_tracked = users.check_barcode(query.from_user.id, barcode)
+    is_tracked, name = users.get_package_specs(user_id, barcode)
+    output = format_helper.format_route_short(package, barcode, custom_name=name)
 
     query.edit_message_text(text=output,
                             reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked, is_show_all_track=True),
@@ -255,8 +256,8 @@ def send_new_package(barcode: str, package: Package, user_id: int, bot):
     logger.debug(
         f'Отправка нового обновления. трек-номер:{barcode}, пользователь:{user_id}')
 
-    output = format_helper.format_route_short(package, barcode)
-    is_tracked = users.check_barcode(user_id, barcode)
+    is_tracked, name = users.get_package_specs(user_id, barcode)
+    output = format_helper.format_route_short(package, barcode, custom_name=name)
 
     return bot.send_message(chat_id=user_id, text=output, parse_mode=telegram.ParseMode.MARKDOWN,
                             reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked, is_show_all_track=True))

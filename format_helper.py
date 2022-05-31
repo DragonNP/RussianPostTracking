@@ -6,23 +6,26 @@ logger = logging.getLogger('format_helper')
 
 def format_route_short(package: Package, barcode, custom_name=''):
     try:
-        history_travel = format_history(package.history[-1])
-
         specs = get_specs(barcode, package, custom_name=custom_name)
-        output = specs + history_travel
+        output = specs
+
+        if len(package.history) > 1:
+            history_travel = format_history(package.history[-1])
+            output += history_travel
+
         return output
     except Exception as e:
         logger.error(e)
         return None
 
 
-def format_route(package: Package, barcode):
+def format_route(package: Package, barcode, custom_name=''):
     history_travel = ''
 
     for point in package.history:
         history_travel = f'{format_history(point)}\n' + history_travel
 
-    specs = get_specs(barcode, package)
+    specs = get_specs(barcode, package, custom_name=custom_name)
     output = specs + history_travel
 
     return output

@@ -222,11 +222,12 @@ class BarcodesDB:
         self.db = json.load(open(self.location, 'r'))
 
     def __dump_db(self, db=''):
-        db = self.db if db == '' else db
+        if db != '':
+            self.db = db
 
         self.logger.debug('Сохранение базы данных в файл')
         try:
-            json.dump(db, open(self.location, 'w+'), ensure_ascii=False)
+            json.dump(self.db, open(self.location, 'w+'), ensure_ascii=False)
             return True
         except Exception as e:
             self.logger.error(e)
