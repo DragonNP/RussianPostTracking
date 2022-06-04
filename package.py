@@ -53,7 +53,7 @@ class Package:
     @staticmethod
     def suds_to_json(result_suds):
         res = {'History': [], 'Mass': 0, 'SenderFullName': '', 'RecipientFullName': '', 'DestinationAddress': '',
-               'DestinationIndex': '', 'SenderAddress': '', 'CountryFrom': '', 'CountryTo': '', 'Name': '', 'Price': 0,
+               'DestinationIndex': '', 'SenderAddress': '', 'CountryFrom': '', 'CountryTo': '', 'Name': 'Посылка', 'Price': 0,
                'IsDelivered': False}
 
         if not ('historyRecord' in result_suds):

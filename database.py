@@ -62,6 +62,21 @@ class UsersDB:
             self.logger.error(f'Не удалось сохранить пользователя. id пользователя:{user_id}', e)
             return False
 
+    def delete_user(self, user_id):
+        self.logger.debug(f'Удаление пользователя. id пользователя:{user_id}')
+
+        try:
+            if not self.__check_user(user_id):
+                self.logger.debug(f'Пользователь не найден. id пользователя:{user_id}')
+                return False
+
+            del self.db[str(user_id)]
+            self.__dump_db()
+            return True
+        except Exception as e:
+            self.logger.error(f'Не удалось удалить пользователя. id пользователя:{user_id}', e)
+            return False
+
     def add_barcode(self, user_id: int, curr_barcode: str, name: str = '', tracked=False, save=True):
         log_vars = f'id пользователя:{user_id}, новый трек-номер:{curr_barcode}, ' \
                    f'имя:{name}, отслеживаемое:{tracked}, сохранить:{save}'

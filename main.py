@@ -259,8 +259,14 @@ def send_new_package(barcode: str, package: Package, user_id: int, bot):
     is_tracked, name = users.get_package_specs(user_id, barcode)
     output = format_helper.format_route_short(package, barcode, custom_name=name)
 
-    return bot.send_message(chat_id=user_id, text=output, parse_mode=telegram.ParseMode.MARKDOWN,
-                            reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked, is_show_all_track=True))
+    try:
+        res = bot.send_message(chat_id=user_id, text=output, parse_mode=telegram.ParseMode.MARKDOWN,
+                               reply_markup=get_keyboard_track(barcode, is_tracked=is_tracked, is_show_all_track=True))
+        print(res)
+        return ''
+    except telegram.error.Unauthorized:
+        logger.info(f'Пользователь заблокировал бота. user_id:{user_id}')
+        return 'blocked'
 
 
 def get_text_my_packages(user_id: int):
@@ -273,12 +279,17 @@ def get_text_my_packages(user_id: int):
         package = Package(curr_barcode)
 
         custom_name = users.get_package_specs(user_id, curr_barcode)[1]
-        parcel_name = custom_name if custom_name else package.name
+        parcel_name = 'Посылка' if (not custom_name and not package.name) \
+            else custom_name if custom_name else package.name
 
-        history = format_helper.format_history(package.history[-1])
-        if not history[0]:
-            return 'Error', history[1]
-        text += f'*{parcel_name} ({curr_barcode})*\n{history}\n\n'
+        text += f'*{parcel_name} ({curr_barcode})*\n'
+        if len(package.history) > 0:
+            history = format_helper.format_history(package.history[-1])
+            if not history[0]:
+                return 'Error', history[1]
+            text += f'{history}\n\n'
+        else:
+            text += '\n'
     return text
 
 
@@ -316,6 +327,9 @@ def remove_delivered(update: Update, context: CallbackContext) -> None:
     edit_message = False
     barcodes = users.get_barcodes(user_id)
     for curr_barcode in barcodes:
+        if not barcodes[curr_barcode]['Tracked']:
+            continue
+
         package = Package(curr_barcode)
         if package.is_delivered:
             users.update_barcode(user_id=user_id, curr_barcode=curr_barcode, tracked=False, save=False)
@@ -344,7 +358,7 @@ def check_new_update(context: CallbackContext):
     _packages = Package.get_saved_packages()
     _new_packages = {}
     _new_version_old_packages = {}
-
+    _users_for_delete = []
     for user_id in _users:
         barcodes = _users[user_id]['barcodes']
 
@@ -354,8 +368,10 @@ def check_new_update(context: CallbackContext):
 
             if curr_barcode in _new_packages:
                 package = Package.from_json(_new_packages[curr_barcode], curr_barcode)
-                send_new_package(barcode=curr_barcode, package=package, user_id=int(user_id),
-                                 bot=context.bot)
+                res = send_new_package(barcode=curr_barcode, package=package, user_id=int(user_id),
+                                       bot=context.bot)
+                if res == 'blocked':
+                    _users_for_delete.append(user_id)
                 continue
 
             updated_package = Package.from_rpt(curr_barcode)
@@ -366,8 +382,13 @@ def check_new_update(context: CallbackContext):
                 continue
 
             _new_packages[curr_barcode] = updated_package.features
-            send_new_package(barcode=curr_barcode, package=updated_package, user_id=int(user_id),
-                             bot=context.bot)
+            res = send_new_package(barcode=curr_barcode, package=updated_package, user_id=int(user_id),
+                                   bot=context.bot)
+            if res == 'blocked':
+                _users_for_delete.append(user_id)
+
+    for user_id in _users_for_delete:
+        users.delete_user(user_id)
     _new_packages.update(_new_version_old_packages)
     Package.save_new_packages(_new_packages)
 
@@ -376,7 +397,7 @@ def error_callback(update: Update, context: CallbackContext):
     error: Exception = context.error
 
     logger.error(error, exc_info=True)
-    if update.message is not None:
+    if update is not None and update.message is not None:
         update.message.reply_text(TEXT_ERROR,
                                   reply_markup=get_keyboard_my_packages(),
                                   disable_web_page_preview=True)
@@ -410,7 +431,7 @@ def main() -> None:
     j.run_daily(check_new_update, days=(0, 1, 2, 3, 4, 5, 6),
                 time=datetime.time(hour=10, minute=00, second=00))
 
-    #j.run_once(check_new_update, 30)
+    # j.run_once(check_new_update, 30)
 
     logger.info('Бот работает')
     # Run the bot until the user presses Ctrl-C or the process receives SIGINT,
