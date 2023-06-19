@@ -95,10 +95,14 @@ def send_everyone_promo(_: Update, context: CallbackContext) -> None:
 
     users_id = users.db.keys()
 
-    for id in users_id:
-        context.bot.send_message(chat_id=id, text=TEXT_PROMO,
-                                 reply_markup=get_keyboard_my_packages(),
-                                 disable_web_page_preview=True)
+    for id in list(users_id):
+        try:
+            context.bot.send_message(chat_id=id, text=TEXT_PROMO,
+                                     reply_markup=get_keyboard_my_packages(),
+                                     disable_web_page_preview=True)
+        except telegram.error.Unauthorized as e:
+            logger.info(f'Пользователь заблокировал бота. user_id:{id}')
+            users.delete_user(id)
 
 
 def send_package(update: Update, _: CallbackContext) -> None:
