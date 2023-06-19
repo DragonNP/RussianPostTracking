@@ -90,15 +90,15 @@ def send_count_users(update: Update, _: CallbackContext) -> None:
                               disable_web_page_preview=True)
 
 
-def send_everyone_promo(update: Update, _: CallbackContext) -> None:
+def send_everyone_promo(_: Update, context: CallbackContext) -> None:
     logger.info('Отправляем рекламу всем пользователяс')
 
     users_id = users.db.keys()
 
     for id in users_id:
-        update.message.reply_text(TEXT_PROMO,
-                                  reply_markup=get_keyboard_my_packages(),
-                                  disable_web_page_preview=True)
+        context.bot.send_message(chat_id=id, text=TEXT_PROMO,
+                                 reply_markup=get_keyboard_my_packages(),
+                                 disable_web_page_preview=True)
 
 
 def send_package(update: Update, _: CallbackContext) -> None:
