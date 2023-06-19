@@ -213,6 +213,29 @@ class UsersDB:
                 f'Не удалось получить все трек-номера. id пользователя:{user_id}', e)
             return False
 
+    def get_count_users(self):
+        self.logger.debug('Получение количество всех пользователей')
+        try:
+            return len(self.db)
+        except Exception as e:
+            self.logger.error(
+                'Не удалось получить количество всех пользователей', e)
+            return False
+
+    def get_count_active_users(self):
+        self.logger.debug('Получение количество активных пользователей')
+        try:
+            c = 0
+            for user in self.db:
+                if len(self.db[user]['barcodes']) >= 3:
+                    c += 1
+            return c
+        except Exception as e:
+            self.logger.error(
+                'Не удалось получить количество активных пользователей', e)
+            return False
+
+
 
 class BarcodesDB:
     logger = logging.getLogger('barcodes_db')

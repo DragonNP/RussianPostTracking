@@ -66,7 +66,7 @@ def get_keyboard_rename():
     return reply_markup
 
 
-def send_start_msg(update: Update, context: CallbackContext) -> None:
+def send_start_msg(update: Update, _: CallbackContext) -> None:
     user_id = update.message.from_user.id
 
     logger.info(f'Новое сообщение: /start или /help. пользователь:{user_id}')
@@ -78,7 +78,30 @@ def send_start_msg(update: Update, context: CallbackContext) -> None:
                               disable_web_page_preview=True)
 
 
-def send_package(update: Update, context: CallbackContext) -> None:
+def send_count_users(update: Update, _: CallbackContext) -> None:
+    logger.info('Отправляем количество пользователей данного бота')
+
+    all_users_count = users.get_count_users()
+    active_users_count = users.get_count_active_users()
+
+    update.message.reply_text(f'Количество всех пользователей: {all_users_count}\n'
+                              f'Количество активных пользователей (больше 2х посылок): {active_users_count}',
+                              reply_markup=get_keyboard_my_packages(),
+                              disable_web_page_preview=True)
+
+
+def send_everyone_promo(update: Update, _: CallbackContext) -> None:
+    logger.info('Отправляем рекламу всем пользователяс')
+
+    users_id = users.db.keys()
+
+    for id in users_id:
+        update.message.reply_text(TEXT_PROMO,
+                                  reply_markup=get_keyboard_my_packages(),
+                                  disable_web_page_preview=True)
+
+
+def send_package(update: Update, _: CallbackContext) -> None:
     barcode = update.message.text
     user_id = update.effective_user.id
 
@@ -121,7 +144,7 @@ def route_callback(update: Update, context: CallbackContext) -> Optional[range]:
         return remove_delivered(update, context)
 
 
-def send_all_history(update: Update, context: CallbackContext) -> None:
+def send_all_history(update: Update, _: CallbackContext) -> None:
     query = update.callback_query
     query.answer()
 
@@ -139,7 +162,7 @@ def send_all_history(update: Update, context: CallbackContext) -> None:
                             parse_mode=telegram.ParseMode.MARKDOWN)
 
 
-def all_history_to_short(update: Update, context: CallbackContext) -> None:
+def all_history_to_short(update: Update, _: CallbackContext) -> None:
     query = update.callback_query
     query.answer()
 
@@ -175,7 +198,7 @@ def start_rename_package(update: Update, context: CallbackContext) -> range:
     return EDIT_NAME
 
 
-def cancel_rename_package(update: Update, context: CallbackContext) -> None:
+def cancel_rename_package(update: Update, context: CallbackContext) -> int:
     user_id = update.effective_user.id
     barcode = context.user_data['rename_barcode']
     message_id = context.user_data['msg_id']
@@ -200,7 +223,7 @@ def cancel_rename_package(update: Update, context: CallbackContext) -> None:
     return ConversationHandler.END
 
 
-def end_rename_package(update: Update, context: CallbackContext) -> None:
+def end_rename_package(update: Update, context: CallbackContext) -> int:
     user_id = update.message.chat_id
     name = update.message.text
     barcode = context.user_data['rename_barcode']
@@ -215,7 +238,7 @@ def end_rename_package(update: Update, context: CallbackContext) -> None:
     return ConversationHandler.END
 
 
-def add_barcode_in_track(update: Update, context: CallbackContext) -> None:
+def add_barcode_in_track(update: Update, _: CallbackContext) -> None:
     query = update.callback_query
     query.answer()
 
@@ -236,7 +259,7 @@ def add_barcode_in_track(update: Update, context: CallbackContext) -> None:
         reply_markup=get_keyboard_track(barcode, is_tracked=result, is_show_all_track=is_show_all_track))
 
 
-def remove_barcode_in_track(update: Update, context: CallbackContext) -> None:
+def remove_barcode_in_track(update: Update, _: CallbackContext) -> None:
     query = update.callback_query
     query.answer()
 
@@ -410,6 +433,8 @@ def main() -> None:
 
     dispatcher.add_handler(CommandHandler('start', send_start_msg))
     dispatcher.add_handler(CommandHandler('help', send_start_msg))
+    dispatcher.add_handler(CommandHandler('send_count_users', send_count_users))
+    dispatcher.add_handler(CommandHandler('send_everyone_promo', send_everyone_promo))
 
     conv_handler = ConversationHandler(
         entry_points=[CallbackQueryHandler(route_callback)],
