@@ -1,6 +1,6 @@
 from russian_post_tracking.soap import RussianPostTracking
 from const_variables import *
-from database import BarcodesDB
+from databases.barcodes import BarcodesDB
 
 barcodes_db = BarcodesDB()
 

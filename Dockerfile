@@ -9,6 +9,8 @@ COPY format_helper.py .
 COPY const_variables.py .
 COPY package.py .
 COPY database.py .
+COPY databases/users.py ./databases/
+COPY databases/barcodes.py ./databases/
 COPY main.py .
 
 CMD ["python", "./main.py"]

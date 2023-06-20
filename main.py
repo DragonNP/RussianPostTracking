@@ -9,7 +9,7 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKe
 from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters, CallbackQueryHandler, \
     JobQueue, ConversationHandler
 from package import Package
-from database import UsersDB
+from databases.users import UsersDB
 from texts import *
 
 logging.basicConfig(level=logging.INFO,
